@@ -1,25 +1,25 @@
-# ⚡ SHOPKCVIP & CYBER BIOMETRIC SUITE 3.0
+# ⚡ CYBER BIOMETRIC ENGINE & AI SUITE v3.0
 
-> **Hệ thống Tích hợp Nền tảng Web & Bộ Công cụ Giám định Sinh trắc học / Phân loại Khuôn mặt AI / Linux CLI Media Streamer**
+> **Bộ Công cụ Giám định Sinh trắc học / Phân loại & Đối khớp Khuôn mặt AI / Linux CLI Media Streamer**
 
 ---
 
 ## 📋 Giới Thiệu Tổng Quan
 
-**ShopKCFF & Cyber Biometric Suite** là một hệ sinh thái phần mềm đa năng được chuẩn hóa kiến trúc bao gồm:
-1. **Web Platform**: Cổng dịch vụ web nạp thẻ tự động, tích hợp Cloudflare Turnstile, Telegram Webhook & Cổng thanh toán thẻ cào.
-2. **Cyber Facial Biometric Engine**: Hệ thống truy quét & đối khớp 1-vs-N sinh trắc học khuôn mặt trực quan qua **Cyber HUD Scanner** (`face_search.py`).
-3. **Cyberpunk Feature Classifier GUI**: Giao diện đồ họa Futurist Neon cho phép trích xuất 5 điểm mốc Landmark, Vector SFace 128-D và phân loại giới tính (`face_feature_classifier.py`).
-4. **Multi-Scale Dataset Categorizer**: Bộ tự động phân loại đa tỷ lệ ảnh thành các tập dữ liệu `nam_va_nu`, `only_nu`, `only_nam` (`classify_gender.py`).
-5. **Image Scraper Suite**: Bộ cào ảnh tự động từ Google/Bing Images (`scrape_google_images.py`).
-6. **Linux CLI Media Streamers**: Bộ phát phim & anime trực tiếp trên màn hình Linux Terminal bằng **Python / Pure Ruby & MPV** (`stream_cli.py` & `ani_cli.rb`).
+**Cyber Biometric Engine & AI Suite** là một bộ công cụ phần mềm chuyên sâu được chuẩn hóa kiến trúc bao gồm các module chính:
+
+1. **Cyber Facial Biometric Engine**: Hệ thống truy quét & đối khớp 1-vs-N sinh trắc học khuôn mặt trực quan qua **Cyber HUD Scanner** (`face_search.py`).
+2. **Cyberpunk Feature Classifier GUI**: Giao diện đồ họa Futurist Neon cho phép trích xuất 5 điểm mốc Landmark, Vector SFace 128-D và phân loại giới tính (`face_feature_classifier.py`).
+3. **Multi-Scale Dataset Categorizer**: Bộ tự động phân loại đa tỷ lệ ảnh thành các tập dữ liệu `nam_va_nu`, `only_nu`, `only_nam` (`classify_gender.py`).
+4. **Image Scraper Suite**: Bộ cào ảnh tự động từ Google/Bing Images (`scrape_google_images.py`).
+5. **Linux CLI Media Streamers**: Bộ phát phim & anime trực tiếp trên màn hình Linux Terminal bằng **Python / Pure Ruby & MPV** (`stream_cli.py` & `ani_cli.rb`).
 
 ---
 
 ## 📂 Cấu Trúc Kiến Trúc Dự Án (Project Architecture)
 
 ```text
-c:\xampp\htdocs\shopkcvip.cc/
+cyber-biometric-suite/
 ├── 🤖 BIOMETRIC & AI FACE ENGINES
 │   ├── face_search.py              # Engine Truy quét 1-vs-N & Cyber HUD Scanner
 │   ├── face_feature_classifier.py  # Module Trích xuất 128-D Vector & Cyberpunk GUI
@@ -41,11 +41,11 @@ c:\xampp\htdocs\shopkcvip.cc/
 │       ├── only_nu/                # Ảnh chỉ có Nữ
 │       └── only_nam/               # Ảnh chỉ có Nam
 │
-└── 🌐 WEB SYSTEM PLATFORM (PHP / MYSQL)
-    ├── admin/                      # Trang quản trị AdminLTE
+└── 🌐 WEB PLATFORM CORE
+    ├── admin/                      # Trang quản trị Admin Panel
     ├── config/                     # Cấu hình Database & Webhooks
-    ├── index.php                   # Trang chủ cổng dịch vụ
-    └── .htaccess                   # Cấu hình Rewrite URL & Security
+    ├── index.php                   # Trang chủ ứng dụng web
+    └── .htaccess                   # Cấu hình Security & Rewrite URL
 ```
 
 ---
@@ -131,4 +131,4 @@ c:\xampp\htdocs\shopkcvip.cc/
 
 ## 📝 Giấy Phép & Bản Quyền
 
-Dự án thuộc bản quyền phát triển chuyên sâu. Mọi mã nguồn đã được tối ưu hóa hiệu năng tối đa.
+Dự án thuộc bản quyền phát triển **Cyber Biometric Engine & AI Suite**. Mọi mã nguồn đã được tối ưu hóa hiệu năng tối đa.
