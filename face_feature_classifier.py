@@ -37,15 +37,60 @@ class FaceFeatureClassifier:
         self.yunet_model = os.path.join(script_dir, yunet_path) if not os.path.isabs(yunet_path) else yunet_path
         self.sface_model = os.path.join(script_dir, sface_path) if not os.path.isabs(sface_path) else sface_path
 
-        if os.path.exists(self.yunet_model):
-            self.detector = cv2.FaceDetectorYN.create(self.yunet_model, "", (320, 320), 0.35, 0.3, 5000)
-        else:
-            self.detector = None
+        try:
+            from gpu_accelerator import create_gpu_face_engine
+            self.detector, self.recognizer, self.gpu_engine = create_gpu_face_engine(self.yunet_model, self.sface_model)
+        except Exception:
+            if os.path.exists(self.yunet_model):
+                self.detector = cv2.FaceDetectorYN.create(self.yunet_model, "", (320, 320), 0.35, 0.3, 5000)
+            else:
+                self.detector = None
 
-        if os.path.exists(self.sface_model):
-            self.recognizer = cv2.FaceRecognizerSF.create(self.sface_model, "")
-        else:
-            self.recognizer = None
+            if os.path.exists(self.sface_model):
+                self.recognizer = cv2.FaceRecognizerSF.create(self.sface_model, "")
+            else:
+                self.recognizer = None
+
+        self.custom_model_path = os.path.join(script_dir, "custom_face_model.json")
+        self.custom_model = self.load_custom_model()
+
+        try:
+            from face_id_scanner import MultiFaceIDGallery
+            self.gallery = MultiFaceIDGallery(yunet_path, sface_path)
+        except Exception:
+            self.gallery = None
+
+    def load_custom_model(self):
+        if os.path.exists(self.custom_model_path):
+            try:
+                with open(self.custom_model_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                return data
+            except Exception:
+                return None
+        return None
+
+    def predict_custom_model(self, feature_128d):
+        if not self.custom_model or not feature_128d:
+            return None
+        try:
+            feat = np.array(feature_128d, dtype=np.float32)
+            W = np.array(self.custom_model["weights"], dtype=np.float32)
+            b = np.array(self.custom_model["biases"], dtype=np.float32)
+            labels = self.custom_model["metadata"]["label_names"]
+
+            logits = np.dot(W, feat) + b
+            exp_logits = np.exp(logits - np.max(logits))
+            probs = exp_logits / np.sum(exp_logits)
+            best_idx = int(np.argmax(probs))
+            conf = float(probs[best_idx] * 100.0)
+
+            return {
+                "label": labels[best_idx],
+                "confidence": round(conf, 2)
+            }
+        except Exception:
+            return None
 
     def extract_facial_biometrics(self, img, face_box, landmarks=None):
         h_img, w_img, _ = img.shape
@@ -148,11 +193,14 @@ class FaceFeatureClassifier:
                     feat = cv2.normalize(feat, None).flatten()
                     embedding_128d = feat.tolist()
 
+                custom_pred = self.predict_custom_model(embedding_128d) if embedding_128d else None
+
                 face_data = {
                     "bbox": box.tolist(),
                     "landmarks": landmarks.tolist(),
                     "detection_score": round(score, 4),
                     "biometrics": bio,
+                    "custom_model_prediction": custom_pred,
                     "embedding_128d_sample": embedding_128d[:5] if embedding_128d else []
                 }
                 results.append(face_data)
@@ -170,6 +218,15 @@ class FaceFeatureClassifier:
         else:
             overall_category = "khong_ro_mat"
 
+        matched_identity = None
+        if self.gallery and os.path.exists(img_path):
+            try:
+                id_res, _ = self.gallery.identify_face_1_to_n(img_path, top_k=3, threshold=0.363)
+                if id_res and id_res.get("best_match"):
+                    matched_identity = id_res["best_match"]
+            except Exception:
+                matched_identity = None
+
         return {
             "image_path": os.path.abspath(img_path),
             "dimensions": [w, h],
@@ -177,6 +234,7 @@ class FaceFeatureClassifier:
             "overall_category": overall_category,
             "male_count": num_males,
             "female_count": num_females,
+            "matched_identity": matched_identity,
             "faces": results
         }
 
@@ -262,11 +320,20 @@ class CyberpunkFaceGUI:
         btn_frame = tk.Frame(parent, bg=self.COLOR_PANEL)
         btn_frame.pack(fill="x", padx=12, pady=4)
 
-        btn_browse_img = tk.Button(btn_frame, text="🖼️ BROWSE IMAGE (XEM 1 ẢNH)", font=self.FONT_MONO_BOLD, fg=self.COLOR_BG, bg=self.COLOR_CYAN, activebackground=self.COLOR_GREEN, bd=0, py=6, command=self.browse_single_image)
+        btn_browse_img = tk.Button(btn_frame, text="🖼️ BROWSE IMAGE (XEM 1 ẢNH)", font=self.FONT_MONO_BOLD, fg=self.COLOR_BG, bg=self.COLOR_CYAN, activebackground=self.COLOR_GREEN, bd=0, pady=6, command=self.browse_single_image)
         btn_browse_img.pack(fill="x", pady=4)
 
-        btn_browse_dir = tk.Button(btn_frame, text="📂 BROWSE DATASET (PHÂN LOẠI KHÔ)", font=self.FONT_MONO_BOLD, fg=self.COLOR_BG, bg=self.COLOR_MAGENTA, activebackground=self.COLOR_YELLOW, bd=0, py=6, command=self.browse_dataset_dir)
+        btn_browse_dir = tk.Button(btn_frame, text="📂 BROWSE DATASET (PHÂN LOẠI KHÔ)", font=self.FONT_MONO_BOLD, fg=self.COLOR_BG, bg=self.COLOR_MAGENTA, activebackground=self.COLOR_YELLOW, bd=0, pady=6, command=self.browse_dataset_dir)
         btn_browse_dir.pack(fill="x", pady=4)
+
+        btn_compare_faces = tk.Button(btn_frame, text="⚡ COMPARE FACES (SO SÁNH 2 ẢNH)", font=self.FONT_MONO_BOLD, fg=self.COLOR_BG, bg=self.COLOR_YELLOW, activebackground=self.COLOR_GREEN, bd=0, pady=6, command=self.open_face_comparator_gui)
+        btn_compare_faces.pack(fill="x", pady=4)
+
+        btn_train_model = tk.Button(btn_frame, text="🤖 TRAIN MODEL MỚI (LÀM GIÀU & TRAIN)", font=self.FONT_MONO_BOLD, fg=self.COLOR_BG, bg=self.COLOR_GREEN, activebackground=self.COLOR_YELLOW, bd=0, pady=6, command=self.run_auto_train_model)
+        btn_train_model.pack(fill="x", pady=4)
+
+        btn_scan_face_id = tk.Button(btn_frame, text="🔎 SEARCH FACEID (QUÉT NHẬN DẠNG 1:N)", font=self.FONT_MONO_BOLD, fg=self.COLOR_BG, bg=self.COLOR_CYAN, activebackground=self.COLOR_GREEN, bd=0, pady=6, command=self.open_face_id_scanner_gui)
+        btn_scan_face_id.pack(fill="x", pady=4)
 
         # Telemetry Card Frame
         lbl_sec2 = tk.Label(parent, text="[ BIOMETRIC TELEMETRY ]", font=self.FONT_HEADER, fg=self.COLOR_CYAN, bg=self.COLOR_PANEL)
@@ -336,18 +403,28 @@ class CyberpunkFaceGUI:
         self.txt_details.insert("end", f"▶ FILE: {os.path.basename(self.current_img_path)}\n")
         self.txt_details.insert("end", f"▶ DIMENSIONS: {data.get('dimensions')}\n\n")
 
+        m_identity = data.get("matched_identity")
+        if m_identity and m_identity.get("is_same_identity"):
+            self.txt_details.insert("end", f"▶ MATCHED FACEID: 🟢 {m_identity['face_id']}\n")
+            self.txt_details.insert("end", f" • File Gốc  : {m_identity['filename']} ({m_identity['folder']})\n")
+            self.txt_details.insert("end", f" • Độ Tương Đồng: {m_identity['cosine_sim']:.4f} ({m_identity['match_percentage']}%)\n\n")
+        else:
+            self.txt_details.insert("end", f"▶ MATCHED FACEID: 🔴 Chưa tìm thấy bản ghi trùng khớp trong kho CSDL\n\n")
+
         for idx, f in enumerate(data.get("faces", []), 1):
             bio = f.get("biometrics", {})
             g = bio.get("gender", "Unknown")
             c = bio.get("confidence", 0)
+            c_pred = f.get("custom_model_prediction")
             emb = f.get("embedding_128d_sample", [])
 
             self.txt_details.insert("end", f"--- FACE #{idx} --- \n")
-            self.txt_details.insert("end", f" • Verdict  : {g} ({c}%)\n")
+            self.txt_details.insert("end", f" • Biometric Verdict: {g} ({c}%)\n")
+            if c_pred:
+                self.txt_details.insert("end", f" • ML Model Predict : {c_pred['label'].upper()} ({c_pred['confidence']}%)\n")
             self.txt_details.insert("end", f" • AspectRatio: {bio.get('aspect_ratio')}\n")
             self.txt_details.insert("end", f" • StubbleVar : {bio.get('stubble_variance')}\n")
-            self.txt_details.insert("end", f" • LipRedness : {bio.get('lip_redness')}\n")
-            self.txt_details.insert("end", f" • 128-D Sample: {emb[:3]}...\n\n")
+            self.txt_details.insert("end", f" • LipRedness : {bio.get('lip_redness')}\n\n")
 
         self.draw_cyber_hud_image()
 
@@ -360,6 +437,7 @@ class CyberpunkFaceGUI:
             return
 
         h, w, _ = img.shape
+        m_identity = self.processed_data.get("matched_identity") if self.processed_data else None
 
         # Vẽ HUD overlays trên ảnh OpenCV
         if self.processed_data and "faces" in self.processed_data:
@@ -382,7 +460,9 @@ class CyberpunkFaceGUI:
 
                 # Nhãn danh tính & Độ tin cậy
                 lbl = f"{gender.upper()} {conf:.0f}%"
-                cv2.putText(img, lbl, (x, max(15, y - 8)), cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
+                if m_identity and m_identity.get("is_same_identity"):
+                    lbl += f" | MATCH: {m_identity['face_id']}"
+                cv2.putText(img, lbl, (x, max(15, y - 8)), cv2.FONT_HERSHEY_SIMPLEX, 0.55, color, 2)
 
         # Chuyển OpenCV (BGR) -> PIL (RGB)
         img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
@@ -434,6 +514,45 @@ class CyberpunkFaceGUI:
         self.lbl_status.config(text="STATUS: 🟢 BATCH FINISHED", fg=self.COLOR_GREEN)
         self.log(f"✨ Hoàn tất phân loại hàng loạt cho thư mục '{dpath}'! Báo cáo JSON đã xuất.")
         messagebox.showinfo("CYBER BIOMETRIC ENGINE", f"Đã phân loại xong toàn bộ ảnh trong '{dpath}'!")
+
+    def open_face_comparator_gui(self):
+        import subprocess
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        compare_script = os.path.join(script_dir, "face_compare_gui.py")
+        if os.path.exists(compare_script):
+            subprocess.Popen([sys.executable, compare_script])
+            self.log("🚀 Đã khởi chạy Giao diện So sánh Nét tương đồng Gương mặt Cyber HUD!")
+        else:
+            messagebox.showerror("Lỗi", f"Không tìm thấy script {compare_script}")
+
+    def run_auto_train_model(self):
+        def _train_worker():
+            self.lbl_status.config(text="STATUS: 🟡 LÀM GIÀU & TRAIN MODEL...", fg=self.COLOR_YELLOW)
+            self.log("🚀 Đang chạy tự động làm giàu dữ liệu (Data Augmentation) & Train Model mới...")
+            import subprocess
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            train_script = os.path.join(script_dir, "train_face_model.py")
+            proc = subprocess.run([sys.executable, train_script], capture_output=True, text=True, encoding='utf-8')
+            if proc.returncode == 0:
+                self.classifier.custom_model = self.classifier.load_custom_model()
+                self.lbl_status.config(text="STATUS: 🟢 MODEL MỚI ĐÃ TRAIN XONG", fg=self.COLOR_GREEN)
+                self.log("✨ Tự động làm giàu dữ liệu & Train Model thành công! Đã nạp custom_face_model.json vào bộ nhớ GUI.")
+                messagebox.showinfo("CYBER BIOMETRIC ENGINE", "Đã tự động làm giàu dữ liệu và train mô hình mới thành công!")
+            else:
+                self.lbl_status.config(text="STATUS: 🔴 LỖI TRAIN MODEL", fg=self.COLOR_MAGENTA)
+                self.log(f"❌ Lỗi train model: {proc.stderr}")
+
+        threading.Thread(target=_train_worker, daemon=True).start()
+
+    def open_face_id_scanner_gui(self):
+        import subprocess
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        scanner_script = os.path.join(script_dir, "face_id_scanner.py")
+        if os.path.exists(scanner_script):
+            subprocess.Popen([sys.executable, scanner_script, "--gui"])
+            self.log("🚀 Đã khởi chạy Giao diện Quét Nhận dạng FaceID 1:N Cyber HUD!")
+        else:
+            messagebox.showerror("Lỗi", f"Không tìm thấy script {scanner_script}")
 
 
 # ==============================================================================
