@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # ==============================================================================
 # CYBER WEB STREAMER - HỆ THỐNG XEM PHIM QUA GIAO DIỆN WEB HTML5 (HLS.JS)
-# TÍCH HỢP PHÂN TRANG (PAGINATION) & LỌC TYPE FILE VIDEO (.mp4,.mkv,.mov,.ts,.webm) + AUDIO (.mp3,.wav,.flac)
+# SỬA DỨT ĐIỂM LỖI LINK POSTER VÀ TỐI ƯU LOAD ẢNH BẰNG PROXY THÔNG MINH
 # Chạy Web Server tại http://IP-HOMELAB:5000 (Xem trên Laptop / Điện thoại / Tablet)
 # ==============================================================================
 
@@ -29,7 +29,6 @@ NAS_SEARCH_PATHS = [
     "F:\\"
 ]
 
-# Các định dạng Video & Audio hỗ trợ quét
 MEDIA_EXTENSIONS = (
     '.mp4', '.mkv', '.mov', '.avi', '.webm', '.flv', '.ts', '.m4v',
     '.mp3', '.wav', '.flac', '.aac', '.m4a', '.ogg'
@@ -47,9 +46,6 @@ AD_KEYWORDS = [
 ]
 
 def scan_nas_media():
-    """
-    Tự động truy quét tất cả file Video & Audio (.mp4, .mkv, .mov, .ts, .webm, .mp3, .wav, .flac) trong ổ đĩa
-    """
     found_files = []
     for base_path in NAS_SEARCH_PATHS:
         if not os.path.exists(base_path):
@@ -115,13 +111,13 @@ def clean_hls_m3u8(m3u8_content, base_url):
 
     return "\n".join(cleaned_lines)
 
-# Giao diện HTML5 Cyberpunk Web Player với Phân Trang & Lọc Loại File Video/Audio
+# Giao diện HTML5 Cyberpunk Web Player với Tự động Hiển thị Ảnh Poster Sắc Nét
 HTML_PAGE = """<!DOCTYPE html>
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>⚡ CYBER STREAMER - PAGINATION & MEDIA TYPE FILTER</title>
+    <title>⚡ CYBER STREAMER - POSTER IMAGE FIXED</title>
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
     <style>
         :root {
@@ -170,7 +166,6 @@ HTML_PAGE = """<!DOCTYPE html>
         }
         button:hover { background: #80fcff; box-shadow: 0 0 15px rgba(0,243,255,0.4); }
 
-        /* Filter Controls Bar */
         .filter-bar {
             display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 15px; align-items: center;
         }
@@ -184,20 +179,18 @@ HTML_PAGE = """<!DOCTYPE html>
 
         .main-layout { display: flex; flex-direction: column; gap: 25px; }
 
-        /* Video Player Section */
         .player-box {
             background: var(--card-bg); padding: 20px; border-radius: 12px;
             border: 1px solid #1e2638; display: flex; flex-direction: column; gap: 15px;
         }
         .video-wrapper {
-            position: relative; width: 100%; padding-top: 45%; /* 21:9 Aspect Ratio */
+            position: relative; width: 100%; padding-top: 45%;
             background: #000; border-radius: 10px; overflow: hidden;
             box-shadow: 0 0 30px rgba(0,0,0,0.8);
         }
         @media (max-width: 768px) { .video-wrapper { padding-top: 56.25%; } }
         video { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border-radius: 10px; }
 
-        /* Movie Cards Grid */
         .grid-box {
             background: var(--card-bg); padding: 20px; border-radius: 12px;
             border: 1px solid #1e2638;
@@ -231,9 +224,9 @@ HTML_PAGE = """<!DOCTYPE html>
         }
         .poster-img {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            object-fit: cover; transition: transform 0.3s ease; opacity: 0.9;
+            object-fit: cover; transition: transform 0.3s ease; opacity: 1;
         }
-        .movie-card:hover .poster-img { transform: scale(1.05); opacity: 1; }
+        .movie-card:hover .poster-img { transform: scale(1.05); }
 
         .badge-overlay {
             position: absolute; top: 8px; left: 8px; z-index: 2;
@@ -261,7 +254,6 @@ HTML_PAGE = """<!DOCTYPE html>
             display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
         .card-subtitle { font-size: 0.75rem; color: var(--muted-text); }
 
-        /* Pagination Bar */
         .pagination-bar {
             display: flex; justify-content: center; align-items: center; gap: 12px;
             margin-top: 25px; padding-top: 15px; border-top: 1px solid #1e2638;
@@ -297,10 +289,9 @@ HTML_PAGE = """<!DOCTYPE html>
 <body>
     <header>
         <h1>⚡ CYBER STREAMER MEDIA PLATFORM</h1>
-        <span>[ 📄 PAGINATION & 🎞️ FILE TYPE FILTER (.ts, .mkv, .mp4, .mp3...) ]</span>
+        <span>[ 🖼️ POSTER IMAGES FIXED & 🛡️ HLS ANTI-AD FILTER ]</span>
     </header>
 
-    <!-- Source Switcher Tabs -->
     <div class="source-switcher">
         <div class="source-btn active" id="btnModeOnline" onclick="switchMode('online')">🌐 TÌM KIẾM ONLINE (KKPHIM)</div>
         <div class="source-btn" id="btnModeNas" onclick="switchMode('nas')">💽 BỘ SƯU TẬP NAS / HDD / SSD (/mnt)</div>
@@ -312,7 +303,6 @@ HTML_PAGE = """<!DOCTYPE html>
     </div>
 
     <div class="main-layout">
-        <!-- Player Section -->
         <div class="player-box">
             <h2 id="mediaTitle" style="font-size: 1.2rem; color: var(--accent-cyan);">CHỌN MỘT PHIM DƯỚI LƯỚI ĐỂ PHÁT...</h2>
             
@@ -329,11 +319,9 @@ HTML_PAGE = """<!DOCTYPE html>
             </div>
         </div>
 
-        <!-- Poster Grid Section -->
         <div class="grid-box">
             <div class="grid-header">
                 <h3 id="gridTitle">🖼️ THƯ VIỆN BỘ PHIM ONLINE</h3>
-                <!-- Filter Bar -->
                 <div class="filter-bar" id="filterBar" style="display: none;">
                     <span style="font-size: 0.8rem; color: var(--muted-text); font-weight: bold;">Lọc loại File:</span>
                     <button class="filter-btn active" onclick="setFilter('all', this)">TẤT CẢ</button>
@@ -346,7 +334,6 @@ HTML_PAGE = """<!DOCTYPE html>
                 <p style="color: var(--muted-text); font-size: 0.9rem;">⏳ Đang tải dữ liệu phim...</p>
             </div>
 
-            <!-- Pagination Bar -->
             <div class="pagination-bar">
                 <button class="page-btn" id="btnPrevPage" onclick="changePage(-1)">◄ TRANG TRƯỚC</button>
                 <span class="page-info" id="pageInfo">Trang 1 / 1</span>
@@ -360,11 +347,10 @@ HTML_PAGE = """<!DOCTYPE html>
         let movieServers = [];
         let currentMode = 'online';
 
-        // Master Items & Pagination State
         let allItems = [];
         let filteredItems = [];
         let currentPage = 1;
-        const PAGE_SIZE = 18; // 18 phim/file trên mỗi trang
+        const PAGE_SIZE = 18;
         let currentFilter = 'all';
 
         function switchMode(mode) {
@@ -408,7 +394,7 @@ HTML_PAGE = """<!DOCTYPE html>
             if (!query) return;
 
             const gridDiv = document.getElementById('movieGrid');
-            gridDiv.innerHTML = '<p style="color: var(--accent-cyan); font-weight: bold;">⏳ Đang tải dữ liệu phim...</p>';
+            gridDiv.innerHTML = '<p style="color: var(--accent-cyan); font-weight: bold;">⏳ Đang tải dữ liệu phim và ảnh Poster sắc nét...</p>';
 
             try {
                 const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
@@ -433,7 +419,7 @@ HTML_PAGE = """<!DOCTYPE html>
 
         async function loadNasMovies() {
             const gridDiv = document.getElementById('movieGrid');
-            gridDiv.innerHTML = '<p style="color: var(--accent-cyan); font-weight: bold;">⏳ Đang tự động truy quét các file Video & Audio (.mp4, .mkv, .mov, .ts, .mp3, .flac) trong ổ đĩa NAS...</p>';
+            gridDiv.innerHTML = '<p style="color: var(--accent-cyan); font-weight: bold;">⏳ Đang tự động truy quét các file Video & Audio trong ổ đĩa NAS...</p>';
 
             try {
                 const res = await fetch('/api/nas');
@@ -497,7 +483,7 @@ HTML_PAGE = """<!DOCTYPE html>
                                 <span class="badge ${langBadgeClass}">${langText}</span>
                             </div>
                             <span class="episode-overlay">${item.episode_current || 'HD'}</span>
-                            <img class="poster-img" src="${posterProxy}" alt="${item.title}" loading="lazy">
+                            <img class="poster-img" src="${posterProxy}" alt="${item.title}" loading="lazy" onerror="this.src='https://via.placeholder.com/300x450/131822/00f3ff?text=NO+IMAGE'">
                         </div>
                         <div class="card-info">
                             <div class="card-title">${item.title}</div>
@@ -506,7 +492,6 @@ HTML_PAGE = """<!DOCTYPE html>
                     `;
                     card.onclick = () => selectMovie(item, card);
                 } else {
-                    // Local NAS Media Card
                     const isAudio = item.type === 'audio';
                     const badgeClass = isAudio ? 'badge-audio' : 'badge-nas';
                     const badgeLabel = isAudio ? item.ext.toUpperCase() : 'LOCAL NAS';
@@ -794,7 +779,14 @@ class CyberStreamerHandler(BaseHTTPRequestHandler):
                             items = data.get("data", {}).get("items", [])
                             for item in items:
                                 poster_rel = item.get('poster_url') or item.get('thumb_url') or ""
-                                poster_full = f"https://phimimg.com/{poster_rel}" if poster_rel else ""
+                                if poster_rel:
+                                    if poster_rel.startswith("http://") or poster_rel.startswith("https://"):
+                                        poster_full = poster_rel
+                                    else:
+                                        poster_full = f"https://phimimg.com/{poster_rel.lstrip('/')}"
+                                else:
+                                    poster_full = ""
+
                                 results.append({
                                     "id": item.get("slug"),
                                     "title": item.get('name'),
@@ -853,7 +845,7 @@ def run():
     httpd = HTTPServer(server_address, CyberStreamerHandler)
 
     print("\033[96m\033[1m")
-    print("  📄 CYBER WEB STREAMER HAS LAUNCHED (PAGINATION & EXTENSION FILTERS ACTIVE)!")
+    print("  🖼️ CYBER WEB STREAMER HAS LAUNCHED (POSTER URL PARSER FIXED)!")
     print("  -------------------------------------------------------------")
     print(f"  👉 Truy cập trên Laptop / Điện thoại: \033[92mhttp://{local_ip}:{PORT}\033[96m")
     print(f"  👉 Truy cập tại máy Homelab local:   \033[92mhttp://localhost:{PORT}\033[96m")
