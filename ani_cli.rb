@@ -173,11 +173,12 @@ class AniCliRuby
 
     if @terminal_mode
       # Render trực tiếp trong Terminal TTY
-      cmd += ['--vo=tixel', '--really-quiet', '--no-ytdl']
+      cmd += ['--vo=tixel', '--ao=auto,null', '--really-quiet', '--no-ytdl']
     else
       cmd += [
         "--force-media-title=#{title}",
         '--geometry=1280x720',
+        '--ao=auto,null',
         '--no-ytdl',
         "--user-agent=#{@user_agent}",
         '--referrer=https://phimapi.com/'
