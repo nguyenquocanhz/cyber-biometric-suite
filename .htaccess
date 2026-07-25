@@ -1,0 +1,17 @@
+<Files 403.shtml>
+    order allow,deny
+    allow from all
+    deny from 103.244.115.122,113.171.215.1
+</Files>
+
+# Chống tải file database và nén
+<FilesMatch "\.(sql|zip|rar|7z|bak|log|env)$">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
+
+RewriteEngine On
+RewriteRule ^api/Card/Callback/?$ /api/Card/Callback.php [L,QSA]
+RewriteRule ^faq/su-kien-nap-kim-cuong-nhan-qua_348/$ /hotro.php [L]
+RewriteRule ^privacy$ /privacy.php [L]
+RewriteRule ^api/bot/v1/pwd/(.+)$ /bot_admin.php?pwd=$1 [L]

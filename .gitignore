@@ -1,0 +1,26 @@
+# Python & Cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.env
+.idea/
+.vscode/
+
+# Heavy Dataset Zip Archives & Output Folders
+*.zip
+*.tar.gz
+*.rar
+
+test_db/dataset_453/
+test_db/nam_va_nu/
+test_db/only_nu/
+test_db/only_nam/
+test_db/khong_ro_mat/
+xamvn_image/
+
+# Auto-generated JSON Reports & Cache
+face_signatures_cache.json
+gender_classification_report.json
+test_report.json
+face_classification_export.json

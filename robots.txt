@@ -1,0 +1,27 @@
+User-agent: *
+Disallow: /admin/
+Disallow: /model/
+Disallow: /config/
+Disallow: /logs/
+Disallow: /database/
+Disallow: /*.json
+
+User-agent: Googlebot
+Allow: /
+Disallow: /admin/
+Disallow: /model/
+Disallow: /config/
+Disallow: /logs/
+Disallow: /database/
+Disallow: /*.json
+
+User-agent: YouTube-PageFinder
+Allow: /
+Disallow: /admin/
+Disallow: /model/
+Disallow: /config/
+Disallow: /logs/
+Disallow: /database/
+Disallow: /*.json
+
+Sitemap: https://shopkcff.com/sitemap.xml
