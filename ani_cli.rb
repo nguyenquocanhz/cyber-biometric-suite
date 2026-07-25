@@ -20,17 +20,20 @@ BOLD    = "\e[1m"
 RESET   = "\e[0m"
 
 class AniCliRuby
-  attr_accessor :player, :terminal_mode, :episode, :server
+  attr_accessor :player, :terminal_mode, :episode, :server, :url_only
 
   def initialize
     @player = 'mpv'
     @terminal_mode = false
     @episode = nil
     @server = 'kkphim' # 'kkphim' (Vietsub) hoặc 'gogoanime' (Engsub)
+    @url_only = false
     @user_agent = 'Mozilla/5.0 (X11; Linux x86_64; rv:120.0) Gecko/20100101 Firefox/120.0'
   end
 
   def print_banner
+    return if @url_only
+
     puts "#{CYAN}#{BOLD}"
     puts '  💎 CYBER MEDIA STREAMER CLI (KKPHIM VIETSUB + GOGOANIME) 💎'
     puts '  -----------------------------------------------------------'
@@ -56,7 +59,7 @@ class AniCliRuby
 
   # Tìm kiếm phim từ Server KKPhim API
   def search_kkphim(query)
-    puts "#{YELLOW}🔍 Đang tìm kiếm trên Server KKPhim (Vietsub) cho: '#{query}'...#{RESET}"
+    puts "#{YELLOW}🔍 Đang tìm kiếm trên Server KKPhim (Vietsub) cho: '#{query}'...#{RESET}" unless @url_only
     api_url = "https://phimapi.com/v1/api/tim-kiem?keyword=#{URI.encode_www_form_component(query)}"
     body = http_get(api_url)
 
@@ -79,7 +82,7 @@ class AniCliRuby
 
   # Tìm kiếm phim từ Gogoanime Fallback
   def search_gogoanime(query)
-    puts "#{YELLOW}🔍 Đang tìm kiếm trên Server GogoAnime (Engsub) cho: '#{query}'...#{RESET}"
+    puts "#{YELLOW}🔍 Đang tìm kiếm trên Server GogoAnime (Engsub) cho: '#{query}'...#{RESET}" unless @url_only
     api_url = "https://consumet-api-clone.vercel.app/anime/gogoanime/#{URI.encode_www_form_component(query)}"
     body = http_get(api_url)
 
@@ -166,6 +169,12 @@ class AniCliRuby
   end
 
   def play_with_mpv(stream_url, title)
+    if @url_only
+      puts "\n#{GREEN}#{BOLD}🔗 LINK STREAM (COPY DÁN VÀO VLC / MPV TRÊN LAPTOP CỦA BẠN):#{RESET}"
+      puts "#{CYAN}#{stream_url}#{RESET}\n\n"
+      return
+    end
+
     puts "\n#{GREEN}#{BOLD}▶ Đang phát luồng phim bằng MPV...#{RESET}"
     puts "#{MAGENTA}m3u8 Stream: #{stream_url}#{RESET}\n"
 
@@ -208,6 +217,10 @@ OptionParser.new do |opts|
     cli.server = srv.downcase
   end
 
+  opts.on('-u', '--url-only', 'Chỉ lấy Link Stream .m3u8 để dán vào VLC/MPV trên Laptop') do
+    cli.url_only = true
+  end
+
   opts.on('-t', '--terminal', 'Phát video trực tiếp trong màn hình Terminal TTY') do
     cli.terminal_mode = true
   end
@@ -244,25 +257,25 @@ if results.empty?
   exit 1
 end
 
-puts "\n#{GREEN}#{BOLD}Danh sách kết quả tìm kiếm (Server #{cli.server.upcase}):#{RESET}"
+puts "\n#{GREEN}#{BOLD}Danh sách kết quả tìm kiếm (Server #{cli.server.upcase}):#{RESET}" unless cli.url_only
 results[0..9].each_with_index do |item, idx|
   puts " #{CYAN}[#{idx + 1}]#{RESET} #{item['title']}"
 end
 
-print "\n#{YELLOW}Chọn số thứ tự phim [1-#{[10, results.length].min}]: #{RESET}"
+print "\n#{YELLOW}Chọn số thứ tự phim [1-#{[10, results.length].min}]: #{RESET}" unless cli.url_only
 choice = STDIN.gets.to_s.strip
 selected_idx = choice.to_i.positive? ? choice.to_i - 1 : 0
 selected = results[selected_idx] || results.first
 
-puts "\n#{GREEN}Đang lấy danh sách tập cho '#{selected['title']}'...#{RESET}"
+puts "\n#{GREEN}Đang lấy danh sách tập cho '#{selected['title']}'...#{RESET}" unless cli.url_only
 
 if selected['source'] == 'kkphim'
   episodes = cli.get_kkphim_episodes(selected['id'])
   if episodes && !episodes.empty?
-    puts "#{CYAN}Tìm thấy tổng cộng #{episodes.length} tập Vietsub.#{RESET}"
+    puts "#{CYAN}Tìm thấy tổng cộng #{episodes.length} tập Vietsub.#{RESET}" unless cli.url_only
     ep_num = cli.episode
     unless ep_num
-      print "#{YELLOW}Chọn số Tập phim [1-#{episodes.length}]: #{RESET}"
+      print "#{YELLOW}Chọn số Tập phim [1-#{episodes.length}]: #{RESET}" unless cli.url_only
       ep_input = STDIN.gets.to_s.strip
       ep_num = ep_input.to_i.positive? ? ep_input.to_i : 1
     end
@@ -274,10 +287,10 @@ if selected['source'] == 'kkphim'
   end
 else
   episodes = cli.get_gogoanime_episodes(selected['id'])
-  puts "#{CYAN}Tìm thấy tổng cộng #{episodes.length} tập Engsub.#{RESET}"
+  puts "#{CYAN}Tìm thấy tổng cộng #{episodes.length} tập Engsub.#{RESET}" unless cli.url_only
   ep_num = cli.episode
   unless ep_num
-    print "#{YELLOW}Chọn số Tập phim [1-#{episodes.length}]: #{RESET}"
+    print "#{YELLOW}Chọn số Tập phim [1-#{episodes.length}]: #{RESET}" unless cli.url_only
     ep_input = STDIN.gets.to_s.strip
     ep_num = ep_input.to_i.positive? ? ep_input.to_i : 1
   end
