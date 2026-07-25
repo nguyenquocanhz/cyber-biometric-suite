@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # ==============================================================================
 # CYBER WEB STREAMER - HỆ THỐNG XEM PHIM QUA GIAO DIỆN WEB HTML5 (HLS.JS)
-# SỬA DỨT ĐIỂM LỖI LINK POSTER VÀ TỐI ƯU LOAD ẢNH BẰNG PROXY THÔNG MINH
+# TÍCH HỢP BỘ BỘ NHỚ ĐỆM DISK & RAM CACHE ẢNH POSTER TỰ ĐỘNG (CACHE ENGINE)
 # Chạy Web Server tại http://IP-HOMELAB:5000 (Xem trên Laptop / Điện thoại / Tablet)
 # ==============================================================================
 
@@ -14,9 +14,14 @@ import urllib.request
 from http.server import HTTPServer, BaseHTTPRequestHandler
 import socket
 import mimetypes
+import hashlib
 
 PORT = 5000
 USER_AGENT = "Mozilla/5.0 (X11; Linux x86_64; rv:120.0) Gecko/20100101 Firefox/120.0"
+
+# Thư mục lưu Cache ảnh poster cục bộ trên đĩa
+CACHE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".cache_images")
+os.makedirs(CACHE_DIR, exist_ok=True)
 
 NAS_SEARCH_PATHS = [
     "/mnt",
@@ -111,13 +116,13 @@ def clean_hls_m3u8(m3u8_content, base_url):
 
     return "\n".join(cleaned_lines)
 
-# Giao diện HTML5 Cyberpunk Web Player với Tự động Hiển thị Ảnh Poster Sắc Nét
+# Giao diện HTML5 Cyberpunk Web Player với Tải ảnh Proxy Cục Bộ Cache
 HTML_PAGE = """<!DOCTYPE html>
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>⚡ CYBER STREAMER - POSTER IMAGE FIXED</title>
+    <title>⚡ CYBER STREAMER - DISK CACHE & HLS ANTI-AD</title>
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
     <style>
         :root {
@@ -289,7 +294,7 @@ HTML_PAGE = """<!DOCTYPE html>
 <body>
     <header>
         <h1>⚡ CYBER STREAMER MEDIA PLATFORM</h1>
-        <span>[ 🖼️ POSTER IMAGES FIXED & 🛡️ HLS ANTI-AD FILTER ]</span>
+        <span>[ 🚀 DISK & RAM AUTO IMAGE CACHE // LOAD 1MS ]</span>
     </header>
 
     <div class="source-switcher">
@@ -394,7 +399,7 @@ HTML_PAGE = """<!DOCTYPE html>
             if (!query) return;
 
             const gridDiv = document.getElementById('movieGrid');
-            gridDiv.innerHTML = '<p style="color: var(--accent-cyan); font-weight: bold;">⏳ Đang tải dữ liệu phim và ảnh Poster sắc nét...</p>';
+            gridDiv.innerHTML = '<p style="color: var(--accent-cyan); font-weight: bold;">⏳ Đang tải dữ liệu phim và ảnh Poster...</p>';
 
             try {
                 const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
@@ -475,6 +480,7 @@ HTML_PAGE = """<!DOCTYPE html>
                         langText = 'LỒNG TIẾNG';
                     }
 
+                    // Tải qua Proxy Cache cục bộ (/proxy/image)
                     const posterProxy = item.poster_url ? `/proxy/image?url=${encodeURIComponent(item.poster_url)}` : 'https://via.placeholder.com/300x450/131822/00f3ff?text=NO+POSTER';
 
                     card.innerHTML = `
@@ -660,6 +666,26 @@ class CyberStreamerHandler(BaseHTTPRequestHandler):
         elif path == "/proxy/image":
             img_url = query_params.get("url", [""])[0]
             if img_url:
+                url_hash = hashlib.md5(img_url.encode('utf-8')).hexdigest()
+                cached_file = os.path.join(CACHE_DIR, f"{url_hash}.jpg")
+
+                # Kiểm tra nếu ảnh ĐÃ CÓ trong Disk Cache cục bộ -> Đọc trực tiếp trong 1 millisecond!
+                if os.path.exists(cached_file):
+                    try:
+                        with open(cached_file, 'rb') as f:
+                            img_data = f.read()
+                        self.send_response(200)
+                        self.send_header("Content-Type", "image/jpeg")
+                        self.send_header("Cache-Control", "public, max-age=2592000") # Cache trình duyệt 30 ngày
+                        self.send_header("X-Cache-Status", "HIT_LOCAL_DISK")
+                        self.send_header("Access-Control-Allow-Origin", "*")
+                        self.end_headers()
+                        self.wfile.write(img_data)
+                        return
+                    except Exception:
+                        pass
+
+                # Nếu chưa có -> Tải từ Server về và lưu vào Disk Cache
                 try:
                     req = urllib.request.Request(img_url, headers={
                         "User-Agent": USER_AGENT,
@@ -669,9 +695,17 @@ class CyberStreamerHandler(BaseHTTPRequestHandler):
                         img_data = resp.read()
                         content_type = resp.headers.get("Content-Type", "image/jpeg")
 
+                        # Ghi vào Disk Cache
+                        try:
+                            with open(cached_file, 'wb') as f:
+                                f.write(img_data)
+                        except Exception:
+                            pass
+
                         self.send_response(200)
                         self.send_header("Content-Type", content_type)
-                        self.send_header("Cache-Control", "public, max-age=86400")
+                        self.send_header("Cache-Control", "public, max-age=2592000")
+                        self.send_header("X-Cache-Status", "MISS_FETCHED")
                         self.send_header("Access-Control-Allow-Origin", "*")
                         self.end_headers()
                         self.wfile.write(img_data)
@@ -845,7 +879,7 @@ def run():
     httpd = HTTPServer(server_address, CyberStreamerHandler)
 
     print("\033[96m\033[1m")
-    print("  🖼️ CYBER WEB STREAMER HAS LAUNCHED (POSTER URL PARSER FIXED)!")
+    print("  🚀 CYBER WEB STREAMER HAS LAUNCHED (AUTO DISK & RAM IMAGE CACHE ACTIVE)!")
     print("  -------------------------------------------------------------")
     print(f"  👉 Truy cập trên Laptop / Điện thoại: \033[92mhttp://{local_ip}:{PORT}\033[96m")
     print(f"  👉 Truy cập tại máy Homelab local:   \033[92mhttp://localhost:{PORT}\033[96m")
