@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 # ==============================================================================
 # CYBER WEB STREAMER - HỆ THỐNG XEM PHIM QUA GIAO DIỆN WEB HTML5 (HLS.JS)
+# TÍCH HỢP BỘ LỌC TỰ ĐỘNG CHẶN QUẢNG CÁO GAME BÀI / CASINO TRONG HLS M3U8
 # Chạy Web Server tại http://IP-HOMELAB:5000 (Xem trên Laptop / Điện thoại / Tablet)
 # ==============================================================================
 
 import os
 import sys
 import json
+import re
 import urllib.parse
 import urllib.request
 from http.server import HTTPServer, BaseHTTPRequestHandler
@@ -15,13 +17,61 @@ import socket
 PORT = 5000
 USER_AGENT = "Mozilla/5.0 (X11; Linux x86_64; rv:120.0) Gecko/20100101 Firefox/120.0"
 
-# Giao diện HTML5 Cyberpunk Web Player (Tích hợp HLS.js xem trực tiếp trên Trình duyệt)
+# Danh sách từ khóa nhận diện Quảng cáo Game bài / Casino / Nhà cái để lọc bỏ khỏi HLS .m3u8
+AD_KEYWORDS = [
+    "bet", "88", "casino", "gamebai", "kubet", "okvip", "shbet", "f8bet", "789bet",
+    "new88", "mb66", "sv388", "123b", "k9win", "hi88", "jun88", "sunwin", "b52",
+    "qc_", "ad_", "banner_", "promo_", "quangcao", "789", "bk8", "w88", "fb88",
+    "fun88", "188bet", "m88", "cmd368", "v9bet", "dafabet", "ricwin", "win79",
+    "go88", "rienvip", "hitclub", "789club", "iwin", "rikvip"
+]
+
+def clean_hls_m3u8(m3u8_content, base_url):
+    """
+    Phân tích & Lọc bỏ toàn bộ các phân đoạn (Segment .ts) chứa Quảng cáo Game Bài khỏi file HLS .m3u8
+    """
+    lines = m3u8_content.splitlines()
+    cleaned_lines = []
+    skip_next_segment = False
+
+    for i in range(len(lines)):
+        line = lines[i].strip()
+
+        # Kiểm tra thẻ thời lượng phân đoạn #EXTINF
+        if line.startswith("#EXTINF"):
+            # Kiểm tra dòng URL phân đoạn kế tiếp
+            if i + 1 < len(lines):
+                next_line = lines[i + 1].strip().lower()
+                # Nếu URL kế tiếp chứa từ khóa Quảng cáo Game bài -> Đánh dấu bỏ qua phân đoạn này
+                if any(kw in next_line for kw in AD_KEYWORDS):
+                    skip_next_segment = True
+                    continue
+
+        if skip_next_segment:
+            skip_next_segment = False
+            continue
+
+        # Lọc các thẻ phân tách quảng cáo #EXT-X-DISCONTINUITY thừa
+        if line.startswith("#EXT-X-DISCONTINUITY") and i + 1 < len(lines):
+            next_line = lines[i + 1].strip().lower()
+            if any(kw in next_line for kw in AD_KEYWORDS):
+                continue
+
+        # Chuẩn hóa đường dẫn tuyệt đối cho các phân đoạn .ts
+        if line and not line.startswith("#") and not line.startswith("http"):
+            line = urllib.parse.urljoin(base_url, line)
+
+        cleaned_lines.append(line)
+
+    return "\n".join(cleaned_lines)
+
+# Giao diện HTML5 Cyberpunk Web Player
 HTML_PAGE = """<!DOCTYPE html>
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>⚡ CYBER STREAMER WEB PLAYER</title>
+    <title>⚡ CYBER STREAMER WEB PLAYER - NO ADS</title>
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
     <style>
         :root {
@@ -29,6 +79,7 @@ HTML_PAGE = """<!DOCTYPE html>
             --card-bg: #131822;
             --accent-cyan: #00f3ff;
             --accent-pink: #ff0055;
+            --accent-green: #00ffaa;
             --text-color: #e2e8f0;
             --muted-text: #94a3b8;
         }
@@ -42,7 +93,7 @@ HTML_PAGE = """<!DOCTYPE html>
             box-shadow: 0 0 20px rgba(0,243,255,0.1);
         }
         header h1 { font-size: 1.4rem; color: var(--accent-cyan); font-weight: 800; letter-spacing: 1px; }
-        header span { font-size: 0.85rem; color: var(--accent-pink); font-family: monospace; font-weight: bold; }
+        header span { font-size: 0.85rem; color: var(--accent-green); font-family: monospace; font-weight: bold; }
 
         .search-box {
             display: flex; gap: 10px; background: var(--card-bg); padding: 15px;
@@ -100,7 +151,7 @@ HTML_PAGE = """<!DOCTYPE html>
 <body>
     <header>
         <h1>⚡ CYBER STREAMER WEB PLAYER</h1>
-        <span>[ KKPHIM VIETSUB & HLS.JS VIDEO PLAYER ]</span>
+        <span>[ 🛡️ HLS ANTI-AD FILTER // CHẶN QUẢNG CÁO GAME BÀI ]</span>
     </header>
 
     <div class="search-box">
@@ -195,21 +246,24 @@ HTML_PAGE = """<!DOCTYPE html>
             }
         }
 
-        function playStream(url, title, btnElement) {
+        function playStream(rawUrl, title, btnElement) {
             document.querySelectorAll('.ep-btn').forEach(b => b.classList.remove('active'));
             if(btnElement) btnElement.classList.add('active');
 
-            document.getElementById('mediaTitle').innerText = `▶ ${title}`;
+            document.getElementById('mediaTitle').innerText = `▶ ${title} [🛡️ ADS BLOCKED]`;
             const video = document.getElementById('videoPlayer');
+
+            // Tự động định tuyến qua HLS Anti-Ad Proxy sạch
+            const cleanUrl = `/proxy/hls?url=${encodeURIComponent(rawUrl)}`;
 
             if (Hls.isSupported()) {
                 if (currentHls) { currentHls.destroy(); }
                 currentHls = new Hls();
-                currentHls.loadSource(url);
+                currentHls.loadSource(cleanUrl);
                 currentHls.attachMedia(video);
                 currentHls.on(Hls.Events.MANIFEST_PARSED, function() { video.play(); });
             } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-                video.src = url;
+                video.src = cleanUrl;
                 video.play();
             }
         }
@@ -236,6 +290,27 @@ class CyberStreamerHandler(BaseHTTPRequestHandler):
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.end_headers()
             self.wfile.write(HTML_PAGE.encode('utf-8'))
+
+        elif path == "/proxy/hls":
+            target_url = query_params.get("url", [""])[0]
+            if target_url:
+                try:
+                    req = urllib.request.Request(target_url, headers={"User-Agent": USER_AGENT})
+                    with urllib.request.urlopen(req, timeout=10) as resp:
+                        content = resp.read().decode('utf-8', errors='ignore')
+                        clean_content = clean_hls_m3u8(content, target_url)
+
+                        self.send_response(200)
+                        self.send_header("Content-Type", "application/vnd.apple.mpegurl")
+                        self.send_header("Access-Control-Allow-Origin", "*")
+                        self.end_headers()
+                        self.wfile.write(clean_content.encode('utf-8'))
+                        return
+                except Exception as e:
+                    pass
+
+            self.send_response(500)
+            self.end_headers()
 
         elif path == "/api/search":
             q = query_params.get("q", [""])[0]
@@ -304,7 +379,7 @@ def run():
     httpd = HTTPServer(server_address, CyberStreamerHandler)
 
     print("\033[96m\033[1m")
-    print("  🌐 CYBER WEB STREAMER HAS LAUNCHED SUCCESSFULLY!")
+    print("  🛡️ CYBER WEB STREAMER HAS LAUNCHED (ANTI-AD FILTER ENGINE ACTIVE)!")
     print("  -------------------------------------------------------------")
     print(f"  👉 Truy cập trên Laptop / Điện thoại: \033[92mhttp://{local_ip}:{PORT}\033[96m")
     print(f"  👉 Truy cập tại máy Homelab local:   \033[92mhttp://localhost:{PORT}\033[96m")
