@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # ==============================================================================
 # CYBER WEB STREAMER - HỆ THỐNG XEM PHIM QUA GIAO DIỆN WEB HTML5 (HLS.JS)
-# TÍCH HỢP PROXY TỐI ƯU HÓA LOAD ẢNH POSTER SIÊU TỐC & HLS ANTI-AD FILTER
+# TÍCH HỢP PHÂN TRANG (PAGINATION) & LỌC TYPE FILE VIDEO (.mp4,.mkv,.mov,.ts,.webm) + AUDIO (.mp3,.wav,.flac)
 # Chạy Web Server tại http://IP-HOMELAB:5000 (Xem trên Laptop / Điện thoại / Tablet)
 # ==============================================================================
 
@@ -29,7 +29,14 @@ NAS_SEARCH_PATHS = [
     "F:\\"
 ]
 
-VIDEO_EXTENSIONS = ('.mp4', '.mkv', '.avi', '.mov', '.webm', '.flv', '.ts', '.m4v')
+# Các định dạng Video & Audio hỗ trợ quét
+MEDIA_EXTENSIONS = (
+    '.mp4', '.mkv', '.mov', '.avi', '.webm', '.flv', '.ts', '.m4v',
+    '.mp3', '.wav', '.flac', '.aac', '.m4a', '.ogg'
+)
+
+VIDEO_EXTS = ('.mp4', '.mkv', '.mov', '.avi', '.webm', '.flv', '.ts', '.m4v')
+AUDIO_EXTS = ('.mp3', '.wav', '.flac', '.aac', '.m4a', '.ogg')
 
 AD_KEYWORDS = [
     "bet", "88", "casino", "gamebai", "kubet", "okvip", "shbet", "f8bet", "789bet",
@@ -39,7 +46,10 @@ AD_KEYWORDS = [
     "go88", "rienvip", "hitclub", "789club", "iwin", "rikvip"
 ]
 
-def scan_nas_videos():
+def scan_nas_media():
+    """
+    Tự động truy quét tất cả file Video & Audio (.mp4, .mkv, .mov, .ts, .webm, .mp3, .wav, .flac) trong ổ đĩa
+    """
     found_files = []
     for base_path in NAS_SEARCH_PATHS:
         if not os.path.exists(base_path):
@@ -49,7 +59,8 @@ def scan_nas_videos():
                 dirs[:] = [d for d in dirs if not d.startswith('.') and d not in ['proc', 'sys', 'dev', 'vendor', 'node_modules']]
                 
                 for f in files:
-                    if f.lower().endswith(VIDEO_EXTENSIONS) and not f.startswith('.'):
+                    ext = os.path.splitext(f)[1].lower()
+                    if ext in MEDIA_EXTENSIONS and not f.startswith('.'):
                         full_path = os.path.join(root, f)
                         try:
                             size_bytes = os.path.getsize(full_path)
@@ -58,10 +69,14 @@ def scan_nas_videos():
                         except Exception:
                             size_str = "Unknown"
 
+                        media_type = "audio" if ext in AUDIO_EXTS else "video"
+
                         found_files.append({
                             "name": f,
                             "path": full_path,
                             "size": size_str,
+                            "ext": ext,
+                            "type": media_type,
                             "folder": os.path.basename(root)
                         })
         except Exception:
@@ -100,13 +115,13 @@ def clean_hls_m3u8(m3u8_content, base_url):
 
     return "\n".join(cleaned_lines)
 
-# Giao diện HTML5 Cyberpunk Web Player với Tải ảnh Proxy Siêu Tốc
+# Giao diện HTML5 Cyberpunk Web Player với Phân Trang & Lọc Loại File Video/Audio
 HTML_PAGE = """<!DOCTYPE html>
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>⚡ CYBER STREAMER - FAST IMAGE PROXY & NAS PLATFORM</title>
+    <title>⚡ CYBER STREAMER - PAGINATION & MEDIA TYPE FILTER</title>
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
     <style>
         :root {
@@ -155,6 +170,18 @@ HTML_PAGE = """<!DOCTYPE html>
         }
         button:hover { background: #80fcff; box-shadow: 0 0 15px rgba(0,243,255,0.4); }
 
+        /* Filter Controls Bar */
+        .filter-bar {
+            display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 15px; align-items: center;
+        }
+        .filter-btn {
+            padding: 6px 14px; background: #182030; color: var(--muted-text);
+            border: 1px solid #1e2638; border-radius: 6px; font-size: 0.8rem; font-weight: bold;
+            cursor: pointer; transition: all 0.2s ease;
+        }
+        .filter-btn:hover { border-color: var(--accent-cyan); color: #fff; }
+        .filter-btn.active { background: var(--accent-pink); color: #fff; border-color: var(--accent-pink); }
+
         .main-layout { display: flex; flex-direction: column; gap: 25px; }
 
         /* Video Player Section */
@@ -175,7 +202,11 @@ HTML_PAGE = """<!DOCTYPE html>
             background: var(--card-bg); padding: 20px; border-radius: 12px;
             border: 1px solid #1e2638;
         }
-        .grid-box h3 { font-size: 1.1rem; color: var(--accent-cyan); margin-bottom: 15px; border-bottom: 1px solid #1e2638; padding-bottom: 10px; }
+        .grid-header {
+            display: flex; justify-content: space-between; align-items: center;
+            border-bottom: 1px solid #1e2638; padding-bottom: 10px; margin-bottom: 15px;
+        }
+        .grid-header h3 { font-size: 1.1rem; color: var(--accent-cyan); }
 
         .movie-grid {
             display: grid;
@@ -200,7 +231,7 @@ HTML_PAGE = """<!DOCTYPE html>
         }
         .poster-img {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            object-fit: cover; transition: transform 0.3s ease, opacity 0.3s ease; opacity: 0.9;
+            object-fit: cover; transition: transform 0.3s ease; opacity: 0.9;
         }
         .movie-card:hover .poster-img { transform: scale(1.05); opacity: 1; }
 
@@ -217,6 +248,7 @@ HTML_PAGE = """<!DOCTYPE html>
         .badge-thuyetminh { background: var(--accent-yellow); color: #000; }
         .badge-longtieng { background: var(--accent-pink); color: #fff; }
         .badge-nas { background: var(--accent-green); color: #000; }
+        .badge-audio { background: #9333ea; color: #fff; }
 
         .episode-overlay {
             position: absolute; bottom: 8px; right: 8px; z-index: 2;
@@ -228,6 +260,20 @@ HTML_PAGE = """<!DOCTYPE html>
         .card-title { font-size: 0.9rem; font-weight: bold; color: #fff; line-height: 1.3;
             display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
         .card-subtitle { font-size: 0.75rem; color: var(--muted-text); }
+
+        /* Pagination Bar */
+        .pagination-bar {
+            display: flex; justify-content: center; align-items: center; gap: 12px;
+            margin-top: 25px; padding-top: 15px; border-top: 1px solid #1e2638;
+        }
+        .page-btn {
+            padding: 8px 16px; background: #1e2638; color: var(--accent-cyan);
+            border: 1px solid #1e2638; border-radius: 6px; font-weight: bold;
+            cursor: pointer; transition: all 0.2s ease;
+        }
+        .page-btn:hover:not(:disabled) { background: var(--accent-cyan); color: #000; }
+        .page-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+        .page-info { font-size: 0.9rem; font-weight: bold; color: var(--text-color); }
 
         .audio-tabs { display: flex; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
         .audio-tab {
@@ -251,7 +297,7 @@ HTML_PAGE = """<!DOCTYPE html>
 <body>
     <header>
         <h1>⚡ CYBER STREAMER MEDIA PLATFORM</h1>
-        <span>[ 🚀 FAST IMAGE PROXY & HLS ANTI-AD FILTER ]</span>
+        <span>[ 📄 PAGINATION & 🎞️ FILE TYPE FILTER (.ts, .mkv, .mp4, .mp3...) ]</span>
     </header>
 
     <!-- Source Switcher Tabs -->
@@ -285,9 +331,26 @@ HTML_PAGE = """<!DOCTYPE html>
 
         <!-- Poster Grid Section -->
         <div class="grid-box">
-            <h3 id="gridTitle">🖼️ THƯ VIỆN BỘ PHIM ONLINE</h3>
+            <div class="grid-header">
+                <h3 id="gridTitle">🖼️ THƯ VIỆN BỘ PHIM ONLINE</h3>
+                <!-- Filter Bar -->
+                <div class="filter-bar" id="filterBar" style="display: none;">
+                    <span style="font-size: 0.8rem; color: var(--muted-text); font-weight: bold;">Lọc loại File:</span>
+                    <button class="filter-btn active" onclick="setFilter('all', this)">TẤT CẢ</button>
+                    <button class="filter-btn" onclick="setFilter('video', this)">🎬 VIDEO (.mp4, .mkv, .ts, .mov)</button>
+                    <button class="filter-btn" onclick="setFilter('audio', this)">🎵 ÂM THANH (.mp3, .wav, .flac)</button>
+                </div>
+            </div>
+
             <div id="movieGrid" class="movie-grid">
                 <p style="color: var(--muted-text); font-size: 0.9rem;">⏳ Đang tải dữ liệu phim...</p>
+            </div>
+
+            <!-- Pagination Bar -->
+            <div class="pagination-bar">
+                <button class="page-btn" id="btnPrevPage" onclick="changePage(-1)">◄ TRANG TRƯỚC</button>
+                <span class="page-info" id="pageInfo">Trang 1 / 1</span>
+                <button class="page-btn" id="btnNextPage" onclick="changePage(1)">TRANG SAU ►</button>
             </div>
         </div>
     </div>
@@ -297,8 +360,16 @@ HTML_PAGE = """<!DOCTYPE html>
         let movieServers = [];
         let currentMode = 'online';
 
+        // Master Items & Pagination State
+        let allItems = [];
+        let filteredItems = [];
+        let currentPage = 1;
+        const PAGE_SIZE = 18; // 18 phim/file trên mỗi trang
+        let currentFilter = 'all';
+
         function switchMode(mode) {
             currentMode = mode;
+            currentPage = 1;
             document.querySelectorAll('.source-btn').forEach(b => b.classList.remove('active'));
 
             if (mode === 'online') {
@@ -306,14 +377,30 @@ HTML_PAGE = """<!DOCTYPE html>
                 document.getElementById('searchContainer').style.display = 'flex';
                 document.getElementById('gridTitle').innerText = '🖼️ THƯ VIỆN BỘ PHIM ONLINE';
                 document.getElementById('episodesContainer').style.display = 'block';
+                document.getElementById('filterBar').style.display = 'none';
                 searchMovie();
             } else {
                 document.getElementById('btnModeNas').classList.add('active');
                 document.getElementById('searchContainer').style.display = 'none';
                 document.getElementById('gridTitle').innerText = '💽 PHIM ĐÃ TẢI TRÊN NAS / HDD / SSD (/mnt)';
                 document.getElementById('episodesContainer').style.display = 'none';
+                document.getElementById('filterBar').style.display = 'flex';
                 loadNasMovies();
             }
+        }
+
+        function setFilter(filterType, btnElement) {
+            currentFilter = filterType;
+            currentPage = 1;
+            document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+            if(btnElement) btnElement.classList.add('active');
+
+            if (filterType === 'all') {
+                filteredItems = allItems;
+            } else {
+                filteredItems = allItems.filter(item => item.type === filterType);
+            }
+            renderPage();
         }
 
         async function searchMovie() {
@@ -321,7 +408,7 @@ HTML_PAGE = """<!DOCTYPE html>
             if (!query) return;
 
             const gridDiv = document.getElementById('movieGrid');
-            gridDiv.innerHTML = '<p style="color: var(--accent-cyan); font-weight: bold;">⏳ Đang tải dữ liệu phim và ảnh Poster siêu tốc...</p>';
+            gridDiv.innerHTML = '<p style="color: var(--accent-cyan); font-weight: bold;">⏳ Đang tải dữ liệu phim...</p>';
 
             try {
                 const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
@@ -329,14 +416,68 @@ HTML_PAGE = """<!DOCTYPE html>
                 
                 if (!data || data.length === 0) {
                     gridDiv.innerHTML = '<p style="color: var(--accent-pink);">❌ Không tìm thấy kết quả phù hợp.</p>';
+                    allItems = [];
+                    filteredItems = [];
+                    updatePaginationUI();
                     return;
                 }
 
-                gridDiv.innerHTML = '';
-                data.forEach((item, index) => {
-                    const card = document.createElement('div');
-                    card.className = 'movie-card';
-                    
+                allItems = data;
+                filteredItems = data;
+                currentPage = 1;
+                renderPage();
+            } catch (e) {
+                gridDiv.innerHTML = '<p style="color: var(--accent-pink);">❌ Lỗi kết nối Server.</p>';
+            }
+        }
+
+        async function loadNasMovies() {
+            const gridDiv = document.getElementById('movieGrid');
+            gridDiv.innerHTML = '<p style="color: var(--accent-cyan); font-weight: bold;">⏳ Đang tự động truy quét các file Video & Audio (.mp4, .mkv, .mov, .ts, .mp3, .flac) trong ổ đĩa NAS...</p>';
+
+            try {
+                const res = await fetch('/api/nas');
+                const files = await res.json();
+
+                if (!files || files.length === 0) {
+                    gridDiv.innerHTML = '<p style="color: var(--accent-pink);">❌ Chưa tìm thấy file phim/nhạc trong các thư mục /mnt, /media.</p>';
+                    allItems = [];
+                    filteredItems = [];
+                    updatePaginationUI();
+                    return;
+                }
+
+                allItems = files;
+                filteredItems = files;
+                currentPage = 1;
+                setFilter(currentFilter, document.querySelector(`.filter-btn.active`));
+            } catch (e) {
+                gridDiv.innerHTML = '<p style="color: var(--accent-pink);">❌ Lỗi nạp kho phim NAS.</p>';
+            }
+        }
+
+        function renderPage() {
+            const gridDiv = document.getElementById('movieGrid');
+            gridDiv.innerHTML = '';
+
+            if (filteredItems.length === 0) {
+                gridDiv.innerHTML = '<p style="color: var(--accent-pink);">❌ Không có file nào khớp với bộ lọc.</p>';
+                updatePaginationUI();
+                return;
+            }
+
+            const totalPages = Math.ceil(filteredItems.length / PAGE_SIZE);
+            currentPage = Math.max(1, Math.min(currentPage, totalPages));
+
+            const startIdx = (currentPage - 1) * PAGE_SIZE;
+            const endIdx = Math.min(startIdx + PAGE_SIZE, filteredItems.length);
+            const pageItems = filteredItems.slice(startIdx, endIdx);
+
+            pageItems.forEach((item, index) => {
+                const card = document.createElement('div');
+                card.className = 'movie-card';
+
+                if (currentMode === 'online') {
                     let langBadgeClass = 'badge-vietsub';
                     let langText = 'VIETSUB';
                     const langLower = (item.lang || '').toLowerCase();
@@ -348,7 +489,6 @@ HTML_PAGE = """<!DOCTYPE html>
                         langText = 'LỒNG TIẾNG';
                     }
 
-                    // Tải ảnh qua Proxy /proxy/image để load 100% mượt mà không bị chặn
                     const posterProxy = item.poster_url ? `/proxy/image?url=${encodeURIComponent(item.poster_url)}` : 'https://via.placeholder.com/300x450/131822/00f3ff?text=NO+POSTER';
 
                     card.innerHTML = `
@@ -364,62 +504,58 @@ HTML_PAGE = """<!DOCTYPE html>
                             <div class="card-subtitle">${item.origin_name || ''} ${item.year ? '• ' + item.year : ''}</div>
                         </div>
                     `;
-
                     card.onclick = () => selectMovie(item, card);
-                    gridDiv.appendChild(card);
-
-                    if (index === 0) { selectMovie(item, card); }
-                });
-            } catch (e) {
-                gridDiv.innerHTML = '<p style="color: var(--accent-pink);">❌ Lỗi kết nối Server.</p>';
-            }
-        }
-
-        async function loadNasMovies() {
-            const gridDiv = document.getElementById('movieGrid');
-            gridDiv.innerHTML = '<p style="color: var(--accent-cyan); font-weight: bold;">⏳ Đang tự động truy quét kho phim trong ổ đĩa NAS / HDD / SSD (/mnt)...</p>';
-
-            try {
-                const res = await fetch('/api/nas');
-                const files = await res.json();
-
-                if (!files || files.length === 0) {
-                    gridDiv.innerHTML = '<p style="color: var(--accent-pink);">❌ Chưa tìm thấy file phim (.mp4, .mkv) trong các thư mục /mnt, /media.</p>';
-                    return;
-                }
-
-                gridDiv.innerHTML = '';
-                files.forEach((file, index) => {
-                    const card = document.createElement('div');
-                    card.className = 'movie-card';
+                } else {
+                    // Local NAS Media Card
+                    const isAudio = item.type === 'audio';
+                    const badgeClass = isAudio ? 'badge-audio' : 'badge-nas';
+                    const badgeLabel = isAudio ? item.ext.toUpperCase() : 'LOCAL NAS';
+                    const icon = isAudio ? '🎵' : '🎬';
 
                     card.innerHTML = `
                         <div class="poster-wrapper" style="background:#151d2a; display:flex; align-items:center; justify-content:center;">
                             <div class="badge-overlay">
-                                <span class="badge badge-nas">LOCAL NAS</span>
+                                <span class="badge ${badgeClass}">${badgeLabel}</span>
                             </div>
-                            <span class="episode-overlay">${file.size}</span>
-                            <div style="font-size: 3rem; color: var(--accent-cyan);">🎬</div>
+                            <span class="episode-overlay">${item.size}</span>
+                            <div style="font-size: 3rem; color: var(--accent-cyan);">${icon}</div>
                         </div>
                         <div class="card-info">
-                            <div class="card-title">${file.name}</div>
-                            <div class="card-subtitle">📂 ${file.folder}</div>
+                            <div class="card-title">${item.name}</div>
+                            <div class="card-subtitle">📂 ${item.folder}</div>
                         </div>
                     `;
+                    card.onclick = () => playNasFile(item, card);
+                }
 
-                    card.onclick = () => playNasFile(file, card);
-                    gridDiv.appendChild(card);
-                });
-            } catch (e) {
-                gridDiv.innerHTML = '<p style="color: var(--accent-pink);">❌ Lỗi nạp kho phim NAS.</p>';
-            }
+                gridDiv.appendChild(card);
+
+                if (index === 0 && currentPage === 1) {
+                    if (currentMode === 'online') selectMovie(item, card);
+                }
+            });
+
+            updatePaginationUI();
+        }
+
+        function updatePaginationUI() {
+            const totalPages = Math.ceil(filteredItems.length / PAGE_SIZE) || 1;
+            document.getElementById('pageInfo').innerText = `Trang ${currentPage} / ${totalPages} (Tổng ${filteredItems.length} mục)`;
+            document.getElementById('btnPrevPage').disabled = (currentPage <= 1);
+            document.getElementById('btnNextPage').disabled = (currentPage >= totalPages);
+        }
+
+        function changePage(delta) {
+            currentPage += delta;
+            renderPage();
+            document.querySelector('.grid-box').scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
 
         function playNasFile(file, cardElement) {
             document.querySelectorAll('.movie-card').forEach(c => c.classList.remove('active'));
             if(cardElement) { cardElement.classList.add('active'); cardElement.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
 
-            document.getElementById('mediaTitle').innerText = `▶ LOCAL NAS: ${file.name} (${file.size})`;
+            document.getElementById('mediaTitle').innerText = `▶ LOCAL NAS (${file.ext.toUpperCase()}): ${file.name} (${file.size})`;
             const video = document.getElementById('videoPlayer');
 
             if (currentHls) { currentHls.destroy(); currentHls = null; }
@@ -550,7 +686,7 @@ class CyberStreamerHandler(BaseHTTPRequestHandler):
 
                         self.send_response(200)
                         self.send_header("Content-Type", content_type)
-                        self.send_header("Cache-Control", "public, max-age=86400") # Cache 24h
+                        self.send_header("Cache-Control", "public, max-age=86400")
                         self.send_header("Access-Control-Allow-Origin", "*")
                         self.end_headers()
                         self.wfile.write(img_data)
@@ -558,14 +694,13 @@ class CyberStreamerHandler(BaseHTTPRequestHandler):
                 except Exception:
                     pass
 
-            # Fallback 1x1 transparent GIF
             self.send_response(200)
             self.send_header("Content-Type", "image/gif")
             self.end_headers()
             self.wfile.write(b'GIF89a\x01\x00\x01\x00\x80\x00\x00\xff\xff\xff\x00\x00\x00!\xf9\x04\x01\x00\x00\x00\x00,\x00\x00\x00\x00\x01\x00\x01\x00\x00\x02\x02D\x01\x00;')
 
         elif path == "/api/nas":
-            files = scan_nas_videos()
+            files = scan_nas_media()
             self.send_response(200)
             self.send_header("Content-Type", "application/json; charset=utf-8")
             self.send_header("Access-Control-Allow-Origin", "*")
@@ -718,7 +853,7 @@ def run():
     httpd = HTTPServer(server_address, CyberStreamerHandler)
 
     print("\033[96m\033[1m")
-    print("  🚀 CYBER WEB STREAMER HAS LAUNCHED (FAST IMAGE PROXY ACTIVE)!")
+    print("  📄 CYBER WEB STREAMER HAS LAUNCHED (PAGINATION & EXTENSION FILTERS ACTIVE)!")
     print("  -------------------------------------------------------------")
     print(f"  👉 Truy cập trên Laptop / Điện thoại: \033[92mhttp://{local_ip}:{PORT}\033[96m")
     print(f"  👉 Truy cập tại máy Homelab local:   \033[92mhttp://localhost:{PORT}\033[96m")
