@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # ==============================================================================
 # CYBER WEB STREAMER - HỆ THỐNG XEM PHIM QUA GIAO DIỆN WEB HTML5 (HLS.JS)
-# TÍCH HỢP BỘ LỌC TỰ ĐỘNG CHẶN QUẢNG CÁO GAME BÀI / CASINO TRONG HLS M3U8
+# CHIA PHÂN LOẠI VIETSUB / THUYẾT MINH / LỒNG TIẾNG & TÍCH HỢP HLS ANTI-AD
 # Chạy Web Server tại http://IP-HOMELAB:5000 (Xem trên Laptop / Điện thoại / Tablet)
 # ==============================================================================
 
@@ -17,7 +17,6 @@ import socket
 PORT = 5000
 USER_AGENT = "Mozilla/5.0 (X11; Linux x86_64; rv:120.0) Gecko/20100101 Firefox/120.0"
 
-# Danh sách từ khóa nhận diện Quảng cáo Game bài / Casino / Nhà cái để lọc bỏ khỏi HLS .m3u8
 AD_KEYWORDS = [
     "bet", "88", "casino", "gamebai", "kubet", "okvip", "shbet", "f8bet", "789bet",
     "new88", "mb66", "sv388", "123b", "k9win", "hi88", "jun88", "sunwin", "b52",
@@ -27,9 +26,6 @@ AD_KEYWORDS = [
 ]
 
 def clean_hls_m3u8(m3u8_content, base_url):
-    """
-    Phân tích & Lọc bỏ toàn bộ các phân đoạn (Segment .ts) chứa Quảng cáo Game Bài khỏi file HLS .m3u8
-    """
     lines = m3u8_content.splitlines()
     cleaned_lines = []
     skip_next_segment = False
@@ -37,12 +33,9 @@ def clean_hls_m3u8(m3u8_content, base_url):
     for i in range(len(lines)):
         line = lines[i].strip()
 
-        # Kiểm tra thẻ thời lượng phân đoạn #EXTINF
         if line.startswith("#EXTINF"):
-            # Kiểm tra dòng URL phân đoạn kế tiếp
             if i + 1 < len(lines):
                 next_line = lines[i + 1].strip().lower()
-                # Nếu URL kế tiếp chứa từ khóa Quảng cáo Game bài -> Đánh dấu bỏ qua phân đoạn này
                 if any(kw in next_line for kw in AD_KEYWORDS):
                     skip_next_segment = True
                     continue
@@ -51,13 +44,11 @@ def clean_hls_m3u8(m3u8_content, base_url):
             skip_next_segment = False
             continue
 
-        # Lọc các thẻ phân tách quảng cáo #EXT-X-DISCONTINUITY thừa
         if line.startswith("#EXT-X-DISCONTINUITY") and i + 1 < len(lines):
             next_line = lines[i + 1].strip().lower()
             if any(kw in next_line for kw in AD_KEYWORDS):
                 continue
 
-        # Chuẩn hóa đường dẫn tuyệt đối cho các phân đoạn .ts
         if line and not line.startswith("#") and not line.startswith("http"):
             line = urllib.parse.urljoin(base_url, line)
 
@@ -65,13 +56,13 @@ def clean_hls_m3u8(m3u8_content, base_url):
 
     return "\n".join(cleaned_lines)
 
-# Giao diện HTML5 Cyberpunk Web Player
+# Giao diện HTML5 Cyberpunk Web Player với phân loại Vietsub / Thuyết Minh / Lồng Tiếng
 HTML_PAGE = """<!DOCTYPE html>
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>⚡ CYBER STREAMER WEB PLAYER - NO ADS</title>
+    <title>⚡ CYBER STREAMER - VIETSUB / THUYẾT MINH / LỒNG TIẾNG</title>
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
     <style>
         :root {
@@ -80,6 +71,7 @@ HTML_PAGE = """<!DOCTYPE html>
             --accent-cyan: #00f3ff;
             --accent-pink: #ff0055;
             --accent-green: #00ffaa;
+            --accent-yellow: #ffcc00;
             --text-color: #e2e8f0;
             --muted-text: #94a3b8;
         }
@@ -110,7 +102,7 @@ HTML_PAGE = """<!DOCTYPE html>
         }
         button:hover { background: #80fcff; box-shadow: 0 0 15px rgba(0,243,255,0.4); }
 
-        .main-container { display: grid; grid-template-columns: 320px 1fr; gap: 20px; }
+        .main-container { display: grid; grid-template-columns: 340px 1fr; gap: 20px; }
         @media (max-width: 900px) { .main-container { grid-template-columns: 1fr; } }
 
         .results-box {
@@ -124,8 +116,15 @@ HTML_PAGE = """<!DOCTYPE html>
         }
         .media-item:hover { border-color: var(--accent-cyan); background: #1f2a3f; }
         .media-item.active { border-color: var(--accent-pink); background: #261a28; }
-        .media-item h4 { font-size: 0.95rem; color: #fff; margin-bottom: 4px; }
-        .media-item p { font-size: 0.8rem; color: var(--muted-text); }
+        .media-item h4 { font-size: 0.95rem; color: #fff; margin-bottom: 6px; }
+
+        .badge {
+            display: inline-block; padding: 2px 8px; font-size: 0.75rem; font-weight: bold;
+            border-radius: 4px; margin-right: 5px; text-transform: uppercase;
+        }
+        .badge-vietsub { background: rgba(0,243,255,0.2); color: var(--accent-cyan); border: 1px solid var(--accent-cyan); }
+        .badge-thuyetminh { background: rgba(255,204,0,0.2); color: var(--accent-yellow); border: 1px solid var(--accent-yellow); }
+        .badge-longtieng { background: rgba(255,0,85,0.2); color: var(--accent-pink); border: 1px solid var(--accent-pink); }
 
         .player-box {
             background: var(--card-bg); padding: 20px; border-radius: 12px;
@@ -138,7 +137,16 @@ HTML_PAGE = """<!DOCTYPE html>
         }
         video { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border-radius: 10px; }
 
-        .episodes-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+        .audio-tabs { display: flex; gap: 10px; margin-bottom: 10px; }
+        .audio-tab {
+            padding: 8px 16px; background: #182030; color: var(--text-color);
+            border-radius: 6px; font-size: 0.85rem; font-weight: bold; cursor: pointer;
+            border: 1px solid #1e2638; transition: all 0.2s ease;
+        }
+        .audio-tab:hover { border-color: var(--accent-cyan); }
+        .audio-tab.active { background: var(--accent-cyan); color: #000; }
+
+        .episodes-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 5px; }
         .ep-btn {
             padding: 8px 16px; background: #1e2638; color: var(--accent-cyan);
             border-radius: 6px; font-size: 0.85rem; font-weight: bold; cursor: pointer;
@@ -151,11 +159,11 @@ HTML_PAGE = """<!DOCTYPE html>
 <body>
     <header>
         <h1>⚡ CYBER STREAMER WEB PLAYER</h1>
-        <span>[ 🛡️ HLS ANTI-AD FILTER // CHẶN QUẢNG CÁO GAME BÀI ]</span>
+        <span>[ 🎙️ PHÂN LOẠI VIETSUB / THUYẾT MINH / LỒNG TIẾNG ]</span>
     </header>
 
     <div class="search-box">
-        <input type="text" id="searchInput" placeholder="Nhập tên phim hoặc anime (Ví dụ: One Piece, Conan, Naruto)..." value="One Piece">
+        <input type="text" id="searchInput" placeholder="Nhập tên phim hoặc anime (Ví dụ: One Piece, Conan, Tây Du Ký)..." value="One Piece">
         <button onclick="searchMovie()">TÌM KIẾM</button>
     </div>
 
@@ -173,7 +181,10 @@ HTML_PAGE = """<!DOCTYPE html>
             </div>
 
             <div style="margin-top: 10px;">
-                <h4 style="font-size: 0.95rem; color: var(--accent-pink); margin-bottom: 8px;">🎬 DANH SÁCH TẬP PHIM:</h4>
+                <h4 style="font-size: 0.95rem; color: var(--accent-yellow); margin-bottom: 8px;">🎙️ NGUỒN ÂM THANH / PHỤ ĐỀ:</h4>
+                <div id="audioTabs" class="audio-tabs"><p style="color: var(--muted-text); font-size: 0.85rem;">Chưa có bản âm thanh nào.</p></div>
+
+                <h4 style="font-size: 0.95rem; color: var(--accent-pink); margin-bottom: 8px; margin-top: 15px;">🎬 DANH SÁCH TẬP PHIM:</h4>
                 <div id="episodesList" class="episodes-grid"><p style="color: var(--muted-text); font-size: 0.85rem;">Chưa có tập nào.</p></div>
             </div>
         </div>
@@ -181,6 +192,7 @@ HTML_PAGE = """<!DOCTYPE html>
 
     <script>
         let currentHls = null;
+        let movieServers = [];
 
         async function searchMovie() {
             const query = document.getElementById('searchInput').value.trim();
@@ -202,7 +214,16 @@ HTML_PAGE = """<!DOCTYPE html>
                 data.forEach(item => {
                     const el = document.createElement('div');
                     el.className = 'media-item';
-                    el.innerHTML = `<h4>${item.title}</h4><p>Server: ${item.source.toUpperCase()}</p>`;
+                    
+                    let langBadge = '<span class="badge badge-vietsub">Vietsub</span>';
+                    const langLower = (item.lang || '').toLowerCase();
+                    if (langLower.includes('thuyết minh')) {
+                        langBadge = '<span class="badge badge-thuyetminh">Thuyết Minh</span>';
+                    } else if (langLower.includes('lồng tiếng')) {
+                        langBadge = '<span class="badge badge-longtieng">Lồng Tiếng</span>';
+                    }
+
+                    el.innerHTML = `<h4>${item.title}</h4><div>${langBadge} <span style="font-size:0.75rem; color:var(--muted-text);">${item.episode_current || ''}</span></div>`;
                     el.onclick = () => selectMovie(item, el);
                     resultsDiv.appendChild(el);
                 });
@@ -216,33 +237,65 @@ HTML_PAGE = """<!DOCTYPE html>
             if(element) element.classList.add('active');
 
             document.getElementById('mediaTitle').innerText = item.title;
+            const audioDiv = document.getElementById('audioTabs');
             const epDiv = document.getElementById('episodesList');
+            
+            audioDiv.innerHTML = '<p style="color: var(--accent-cyan);">⏳ Đang nạp nguồn âm thanh...</p>';
             epDiv.innerHTML = '<p style="color: var(--accent-cyan);">⏳ Đang nạp danh sách tập...</p>';
 
             try {
                 const res = await fetch(`/api/episodes?slug=${encodeURIComponent(item.id)}`);
-                const episodes = await res.json();
+                movieServers = await res.json();
 
-                if (!episodes || episodes.length === 0) {
+                if (!movieServers || movieServers.length === 0) {
+                    audioDiv.innerHTML = '<p style="color: var(--accent-pink);">❌ Không có nguồn âm thanh.</p>';
                     epDiv.innerHTML = '<p style="color: var(--accent-pink);">❌ Không có tập phim nào.</p>';
                     return;
                 }
 
-                epDiv.innerHTML = '';
-                episodes.forEach((ep, idx) => {
-                    const btn = document.createElement('button');
-                    btn.className = 'ep-btn';
-                    btn.innerText = ep.name || `Tập ${idx+1}`;
-                    btn.onclick = () => playStream(ep.link_m3u8, `${item.title} - ${ep.name}`, btn);
-                    epDiv.appendChild(btn);
+                // Render Audio Server Tabs (Vietsub / Thuyết Minh / Lồng Tiếng)
+                audioDiv.innerHTML = '';
+                movieServers.forEach((srv, idx) => {
+                    const tab = document.createElement('div');
+                    tab.className = `audio-tab ${idx === 0 ? 'active' : ''}`;
+                    tab.innerText = srv.server_name || `Nguồn #${idx+1}`;
+                    tab.onclick = () => renderServerEpisodes(idx, tab, item.title);
+                    audioDiv.appendChild(tab);
                 });
 
-                // Auto play first episode
-                if (episodes.length > 0) {
-                    playStream(episodes[0].link_m3u8, `${item.title} - ${episodes[0].name}`, epDiv.children[0]);
-                }
+                // Render First Server Episodes
+                renderServerEpisodes(0, audioDiv.children[0], item.title);
+
             } catch (e) {
+                audioDiv.innerHTML = '<p style="color: var(--accent-pink);">❌ Lỗi nạp nguồn âm thanh.</p>';
                 epDiv.innerHTML = '<p style="color: var(--accent-pink);">❌ Lỗi nạp tập phim.</p>';
+            }
+        }
+
+        function renderServerEpisodes(serverIdx, tabElement, movieTitle) {
+            document.querySelectorAll('.audio-tab').forEach(t => t.classList.remove('active'));
+            if(tabElement) tabElement.classList.add('active');
+
+            const epDiv = document.getElementById('episodesList');
+            const server = movieServers[serverIdx];
+
+            if (!server || !server.server_data || server.server_data.length === 0) {
+                epDiv.innerHTML = '<p style="color: var(--accent-pink);">❌ Không có tập phim nào trên nguồn này.</p>';
+                return;
+            }
+
+            epDiv.innerHTML = '';
+            server.server_data.forEach((ep, idx) => {
+                const btn = document.createElement('button');
+                btn.className = 'ep-btn';
+                btn.innerText = ep.name || `Tập ${idx+1}`;
+                btn.onclick = () => playStream(ep.link_m3u8, `${movieTitle} - [${server.server_name}] - ${ep.name}`, btn);
+                epDiv.appendChild(btn);
+            });
+
+            // Auto play first episode
+            if (server.server_data.length > 0) {
+                playStream(server.server_data[0].link_m3u8, `${movieTitle} - [${server.server_name}] - ${server.server_data[0].name}`, epDiv.children[0]);
             }
         }
 
@@ -253,7 +306,6 @@ HTML_PAGE = """<!DOCTYPE html>
             document.getElementById('mediaTitle').innerText = `▶ ${title} [🛡️ ADS BLOCKED]`;
             const video = document.getElementById('videoPlayer');
 
-            // Tự động định tuyến qua HLS Anti-Ad Proxy sạch
             const cleanUrl = `/proxy/hls?url=${encodeURIComponent(rawUrl)}`;
 
             if (Hls.isSupported()) {
@@ -327,6 +379,8 @@ class CyberStreamerHandler(BaseHTTPRequestHandler):
                                 results.append({
                                     "id": item.get("slug"),
                                     "title": f"{item.get('name')} ({item.get('origin_name')} - {item.get('year')})",
+                                    "lang": item.get("lang", "Vietsub"),
+                                    "episode_current": item.get("episode_current", ""),
                                     "source": "kkphim"
                                 })
                 except Exception:
@@ -340,7 +394,7 @@ class CyberStreamerHandler(BaseHTTPRequestHandler):
 
         elif path == "/api/episodes":
             slug = query_params.get("slug", [""])[0]
-            episodes = []
+            servers = []
             if slug:
                 url = f"https://phimapi.com/phim/{slug}"
                 try:
@@ -348,9 +402,7 @@ class CyberStreamerHandler(BaseHTTPRequestHandler):
                     with urllib.request.urlopen(req, timeout=8) as resp:
                         if resp.status == 200:
                             data = json.loads(resp.read().decode('utf-8'))
-                            eps = data.get("episodes", [])
-                            if eps:
-                                episodes = eps[0].get("server_data", [])
+                            servers = data.get("episodes", [])
                 except Exception:
                     pass
 
@@ -358,7 +410,7 @@ class CyberStreamerHandler(BaseHTTPRequestHandler):
             self.send_header("Content-Type", "application/json; charset=utf-8")
             self.send_header("Access-Control-Allow-Origin", "*")
             self.end_headers()
-            self.wfile.write(json.dumps(episodes).encode('utf-8'))
+            self.wfile.write(json.dumps(servers).encode('utf-8'))
         else:
             self.send_response(404)
             self.end_headers()
@@ -379,7 +431,7 @@ def run():
     httpd = HTTPServer(server_address, CyberStreamerHandler)
 
     print("\033[96m\033[1m")
-    print("  🛡️ CYBER WEB STREAMER HAS LAUNCHED (ANTI-AD FILTER ENGINE ACTIVE)!")
+    print("  🎙️ CYBER WEB STREAMER HAS LAUNCHED (VIETSUB / THUYẾT MINH / LỒNG TIẾNG ACTIVE)!")
     print("  -------------------------------------------------------------")
     print(f"  👉 Truy cập trên Laptop / Điện thoại: \033[92mhttp://{local_ip}:{PORT}\033[96m")
     print(f"  👉 Truy cập tại máy Homelab local:   \033[92mhttp://localhost:{PORT}\033[96m")
