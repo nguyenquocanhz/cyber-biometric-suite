@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # ==============================================================================
 # CYBER WEB STREAMER - HỆ THỐNG XEM PHIM QUA GIAO DIỆN WEB HTML5 (HLS.JS)
-# CHIA PHÂN LOẠI VIETSUB / THUYẾT MINH / LỒNG TIẾNG & TÍCH HỢP HLS ANTI-AD
+# GIAO DIỆN MOVIE GRID LƯỚI HÌNH ẢNH POSTER (NETFLIX STYLE)
 # Chạy Web Server tại http://IP-HOMELAB:5000 (Xem trên Laptop / Điện thoại / Tablet)
 # ==============================================================================
 
@@ -56,13 +56,13 @@ def clean_hls_m3u8(m3u8_content, base_url):
 
     return "\n".join(cleaned_lines)
 
-# Giao diện HTML5 Cyberpunk Web Player với phân loại Vietsub / Thuyết Minh / Lồng Tiếng
+# Giao diện HTML5 Cyberpunk Web Player với Lưới ảnh Poster Phim (Movie Grid)
 HTML_PAGE = """<!DOCTYPE html>
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>⚡ CYBER STREAMER - VIETSUB / THUYẾT MINH / LỒNG TIẾNG</title>
+    <title>⚡ CYBER STREAMER - MOVIE POSTER GRID</title>
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
     <style>
         :root {
@@ -102,42 +102,80 @@ HTML_PAGE = """<!DOCTYPE html>
         }
         button:hover { background: #80fcff; box-shadow: 0 0 15px rgba(0,243,255,0.4); }
 
-        .main-container { display: grid; grid-template-columns: 340px 1fr; gap: 20px; }
-        @media (max-width: 900px) { .main-container { grid-template-columns: 1fr; } }
+        .main-layout { display: flex; flex-direction: column; gap: 25px; }
 
-        .results-box {
-            background: var(--card-bg); padding: 15px; border-radius: 12px;
-            border: 1px solid #1e2638; max-height: 650px; overflow-y: auto;
-        }
-        .results-box h3 { font-size: 1rem; color: var(--accent-cyan); margin-bottom: 12px; border-bottom: 1px solid #1e2638; padding-bottom: 8px; }
-        .media-item {
-            padding: 12px; background: #182030; border-radius: 8px; margin-bottom: 10px;
-            cursor: pointer; transition: all 0.2s ease; border: 1px solid transparent;
-        }
-        .media-item:hover { border-color: var(--accent-cyan); background: #1f2a3f; }
-        .media-item.active { border-color: var(--accent-pink); background: #261a28; }
-        .media-item h4 { font-size: 0.95rem; color: #fff; margin-bottom: 6px; }
-
-        .badge {
-            display: inline-block; padding: 2px 8px; font-size: 0.75rem; font-weight: bold;
-            border-radius: 4px; margin-right: 5px; text-transform: uppercase;
-        }
-        .badge-vietsub { background: rgba(0,243,255,0.2); color: var(--accent-cyan); border: 1px solid var(--accent-cyan); }
-        .badge-thuyetminh { background: rgba(255,204,0,0.2); color: var(--accent-yellow); border: 1px solid var(--accent-yellow); }
-        .badge-longtieng { background: rgba(255,0,85,0.2); color: var(--accent-pink); border: 1px solid var(--accent-pink); }
-
+        /* Video Player Section */
         .player-box {
             background: var(--card-bg); padding: 20px; border-radius: 12px;
             border: 1px solid #1e2638; display: flex; flex-direction: column; gap: 15px;
         }
         .video-wrapper {
-            position: relative; width: 100%; padding-top: 56.25%; /* 16:9 Aspect Ratio */
+            position: relative; width: 100%; padding-top: 45%; /* 21:9 Aspect Ratio */
             background: #000; border-radius: 10px; overflow: hidden;
             box-shadow: 0 0 30px rgba(0,0,0,0.8);
         }
+        @media (max-width: 768px) { .video-wrapper { padding-top: 56.25%; } }
         video { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border-radius: 10px; }
 
-        .audio-tabs { display: flex; gap: 10px; margin-bottom: 10px; }
+        /* Movie Cards Grid */
+        .grid-box {
+            background: var(--card-bg); padding: 20px; border-radius: 12px;
+            border: 1px solid #1e2638;
+        }
+        .grid-box h3 { font-size: 1.1rem; color: var(--accent-cyan); margin-bottom: 15px; border-bottom: 1px solid #1e2638; padding-bottom: 10px; }
+
+        .movie-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+            gap: 18px;
+        }
+
+        .movie-card {
+            background: #182030; border-radius: 10px; overflow: hidden;
+            border: 1px solid #1e2638; cursor: pointer; transition: all 0.3s ease;
+            position: relative; display: flex; flex-direction: column;
+        }
+        .movie-card:hover {
+            transform: translateY(-5px); border-color: var(--accent-cyan);
+            box-shadow: 0 8px 25px rgba(0,243,255,0.3);
+        }
+        .movie-card.active { border-color: var(--accent-pink); box-shadow: 0 8px 25px rgba(255,0,85,0.4); }
+
+        .poster-wrapper {
+            position: relative; width: 100%; padding-top: 145%; /* Poster Aspect Ratio */
+            background: #0d121c; overflow: hidden;
+        }
+        .poster-img {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            object-fit: cover; transition: transform 0.3s ease;
+        }
+        .movie-card:hover .poster-img { transform: scale(1.05); }
+
+        .badge-overlay {
+            position: absolute; top: 8px; left: 8px; z-index: 2;
+            display: flex; flex-direction: column; gap: 4px;
+        }
+        .badge {
+            display: inline-block; padding: 3px 8px; font-size: 0.7rem; font-weight: 800;
+            border-radius: 4px; text-transform: uppercase; letter-spacing: 0.5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+        }
+        .badge-vietsub { background: var(--accent-cyan); color: #000; }
+        .badge-thuyetminh { background: var(--accent-yellow); color: #000; }
+        .badge-longtieng { background: var(--accent-pink); color: #fff; }
+
+        .episode-overlay {
+            position: absolute; bottom: 8px; right: 8px; z-index: 2;
+            background: rgba(0,0,0,0.85); color: #fff; padding: 2px 6px;
+            font-size: 0.75rem; border-radius: 4px; font-weight: bold; border: 1px solid rgba(255,255,255,0.2);
+        }
+
+        .card-info { padding: 12px; display: flex; flex-direction: column; gap: 4px; flex: 1; }
+        .card-title { font-size: 0.9rem; font-weight: bold; color: #fff; line-height: 1.3;
+            display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        .card-subtitle { font-size: 0.75rem; color: var(--muted-text); }
+
+        .audio-tabs { display: flex; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
         .audio-tab {
             padding: 8px 16px; background: #182030; color: var(--text-color);
             border-radius: 6px; font-size: 0.85rem; font-weight: bold; cursor: pointer;
@@ -146,7 +184,7 @@ HTML_PAGE = """<!DOCTYPE html>
         .audio-tab:hover { border-color: var(--accent-cyan); }
         .audio-tab.active { background: var(--accent-cyan); color: #000; }
 
-        .episodes-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 5px; }
+        .episodes-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 5px; max-height: 200px; overflow-y: auto; }
         .ep-btn {
             padding: 8px 16px; background: #1e2638; color: var(--accent-cyan);
             border-radius: 6px; font-size: 0.85rem; font-weight: bold; cursor: pointer;
@@ -158,23 +196,19 @@ HTML_PAGE = """<!DOCTYPE html>
 </head>
 <body>
     <header>
-        <h1>⚡ CYBER STREAMER WEB PLAYER</h1>
-        <span>[ 🎙️ PHÂN LOẠI VIETSUB / THUYẾT MINH / LỒNG TIẾNG ]</span>
+        <h1>⚡ CYBER STREAMER MOVIE GRID</h1>
+        <span>[ 🎬 POSTER GRID & VIETSUB / THUYẾT MINH / LỒNG TIẾNG ]</span>
     </header>
 
     <div class="search-box">
-        <input type="text" id="searchInput" placeholder="Nhập tên phim hoặc anime (Ví dụ: One Piece, Conan, Tây Du Ký)..." value="One Piece">
-        <button onclick="searchMovie()">TÌM KIẾM</button>
+        <input type="text" id="searchInput" placeholder="Nhập tên phim hoặc anime (Ví dụ: One Piece, Conan, Tây Du Ký, Marvel)..." value="One Piece">
+        <button onclick="searchMovie()">TÌM KIẾM PHIM</button>
     </div>
 
-    <div class="main-container">
-        <div class="results-box">
-            <h3>📺 KẾT QUẢ TÌM KIẾM</h3>
-            <div id="resultsList"><p style="color: var(--muted-text); font-size: 0.9rem;">Nhập từ khóa và bấm Tìm kiếm...</p></div>
-        </div>
-
+    <div class="main-layout">
+        <!-- Player Section -->
         <div class="player-box">
-            <h2 id="mediaTitle" style="font-size: 1.2rem; color: var(--accent-cyan);">ĐANG CHỜ CHỌN PHIM...</h2>
+            <h2 id="mediaTitle" style="font-size: 1.2rem; color: var(--accent-cyan);">CHỌN MỘT PHIM DƯỚI LƯỚI ĐỂ PHÁT...</h2>
             
             <div class="video-wrapper">
                 <video id="videoPlayer" controls autoplay crossorigin="anonymous"></video>
@@ -182,10 +216,18 @@ HTML_PAGE = """<!DOCTYPE html>
 
             <div style="margin-top: 10px;">
                 <h4 style="font-size: 0.95rem; color: var(--accent-yellow); margin-bottom: 8px;">🎙️ NGUỒN ÂM THANH / PHỤ ĐỀ:</h4>
-                <div id="audioTabs" class="audio-tabs"><p style="color: var(--muted-text); font-size: 0.85rem;">Chưa có bản âm thanh nào.</p></div>
+                <div id="audioTabs" class="audio-tabs"><p style="color: var(--muted-text); font-size: 0.85rem;">Chưa chọn phim nào.</p></div>
 
-                <h4 style="font-size: 0.95rem; color: var(--accent-pink); margin-bottom: 8px; margin-top: 15px;">🎬 DANH SÁCH TẬP PHIM:</h4>
+                <h4 style="font-size: 0.95rem; color: var(--accent-pink); margin-bottom: 8px; margin-top: 12px;">🎬 DANH SÁCH TẬP PHIM:</h4>
                 <div id="episodesList" class="episodes-grid"><p style="color: var(--muted-text); font-size: 0.85rem;">Chưa có tập nào.</p></div>
+            </div>
+        </div>
+
+        <!-- Poster Grid Section -->
+        <div class="grid-box">
+            <h3>🖼️ THƯ VIỆN BỘ PHIM (MOVIE POSTER GRID)</h3>
+            <div id="movieGrid" class="movie-grid">
+                <p style="color: var(--muted-text); font-size: 0.9rem;">⏳ Đang tải dữ liệu phim...</p>
             </div>
         </div>
     </div>
@@ -198,43 +240,69 @@ HTML_PAGE = """<!DOCTYPE html>
             const query = document.getElementById('searchInput').value.trim();
             if (!query) return;
 
-            const resultsDiv = document.getElementById('resultsList');
-            resultsDiv.innerHTML = '<p style="color: var(--accent-cyan);">⏳ Đang tìm kiếm dữ liệu...</p>';
+            const gridDiv = document.getElementById('movieGrid');
+            gridDiv.innerHTML = '<p style="color: var(--accent-cyan); font-weight: bold;">⏳ Đang tìm kiếm dữ liệu phim và ảnh Poster...</p>';
 
             try {
                 const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
                 const data = await res.json();
                 
                 if (!data || data.length === 0) {
-                    resultsDiv.innerHTML = '<p style="color: var(--accent-pink);">❌ Không tìm thấy kết quả.</p>';
+                    gridDiv.innerHTML = '<p style="color: var(--accent-pink);">❌ Không tìm thấy kết quả phù hợp.</p>';
                     return;
                 }
 
-                resultsDiv.innerHTML = '';
-                data.forEach(item => {
-                    const el = document.createElement('div');
-                    el.className = 'media-item';
+                gridDiv.innerHTML = '';
+                data.forEach((item, index) => {
+                    const card = document.createElement('div');
+                    card.className = 'movie-card';
                     
-                    let langBadge = '<span class="badge badge-vietsub">Vietsub</span>';
+                    let langBadgeClass = 'badge-vietsub';
+                    let langText = 'VIETSUB';
                     const langLower = (item.lang || '').toLowerCase();
                     if (langLower.includes('thuyết minh')) {
-                        langBadge = '<span class="badge badge-thuyetminh">Thuyết Minh</span>';
+                        langBadgeClass = 'badge-thuyetminh';
+                        langText = 'THUYẾT MINH';
                     } else if (langLower.includes('lồng tiếng')) {
-                        langBadge = '<span class="badge badge-longtieng">Lồng Tiếng</span>';
+                        langBadgeClass = 'badge-longtieng';
+                        langText = 'LỒNG TIẾNG';
                     }
 
-                    el.innerHTML = `<h4>${item.title}</h4><div>${langBadge} <span style="font-size:0.75rem; color:var(--muted-text);">${item.episode_current || ''}</span></div>`;
-                    el.onclick = () => selectMovie(item, el);
-                    resultsDiv.appendChild(el);
+                    const posterImg = item.poster_url ? item.poster_url : 'https://via.placeholder.com/300x450/131822/00f3ff?text=NO+POSTER';
+
+                    card.innerHTML = `
+                        <div class="poster-wrapper">
+                            <div class="badge-overlay">
+                                <span class="badge ${langBadgeClass}">${langText}</span>
+                            </div>
+                            <span class="episode-overlay">${item.episode_current || 'HD'}</span>
+                            <img class="poster-img" src="${posterImg}" alt="${item.title}" loading="lazy" onerror="this.src='https://via.placeholder.com/300x450/131822/00f3ff?text=IMAGE+ERROR'">
+                        </div>
+                        <div class="card-info">
+                            <div class="card-title">${item.title}</div>
+                            <div class="card-subtitle">${item.origin_name || ''} ${item.year ? '• ' + item.year : ''}</div>
+                        </div>
+                    `;
+
+                    card.onclick = () => selectMovie(item, card);
+                    gridDiv.appendChild(card);
+
+                    // Auto select first movie
+                    if (index === 0) {
+                        selectMovie(item, card);
+                    }
                 });
             } catch (e) {
-                resultsDiv.innerHTML = '<p style="color: var(--accent-pink);">❌ Lỗi kết nối Server.</p>';
+                gridDiv.innerHTML = '<p style="color: var(--accent-pink);">❌ Lỗi kết nối Server.</p>';
             }
         }
 
         async function selectMovie(item, element) {
-            document.querySelectorAll('.media-item').forEach(e => e.classList.remove('active'));
-            if(element) element.classList.add('active');
+            document.querySelectorAll('.movie-card').forEach(c => c.classList.remove('active'));
+            if(element) {
+                element.classList.add('active');
+                element.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
 
             document.getElementById('mediaTitle').innerText = item.title;
             const audioDiv = document.getElementById('audioTabs');
@@ -253,7 +321,7 @@ HTML_PAGE = """<!DOCTYPE html>
                     return;
                 }
 
-                // Render Audio Server Tabs (Vietsub / Thuyết Minh / Lồng Tiếng)
+                // Render Audio Server Tabs
                 audioDiv.innerHTML = '';
                 movieServers.forEach((srv, idx) => {
                     const tab = document.createElement('div');
@@ -376,11 +444,16 @@ class CyberStreamerHandler(BaseHTTPRequestHandler):
                             data = json.loads(resp.read().decode('utf-8'))
                             items = data.get("data", {}).get("items", [])
                             for item in items:
+                                poster_rel = item.get('poster_url') or item.get('thumb_url') or ""
+                                poster_full = f"https://phimimg.com/{poster_rel}" if poster_rel else ""
                                 results.append({
                                     "id": item.get("slug"),
-                                    "title": f"{item.get('name')} ({item.get('origin_name')} - {item.get('year')})",
+                                    "title": item.get('name'),
+                                    "origin_name": item.get('origin_name'),
+                                    "year": item.get('year'),
+                                    "poster_url": poster_full,
                                     "lang": item.get("lang", "Vietsub"),
-                                    "episode_current": item.get("episode_current", ""),
+                                    "episode_current": item.get("episode_current", "HD"),
                                     "source": "kkphim"
                                 })
                 except Exception:
@@ -431,7 +504,7 @@ def run():
     httpd = HTTPServer(server_address, CyberStreamerHandler)
 
     print("\033[96m\033[1m")
-    print("  🎙️ CYBER WEB STREAMER HAS LAUNCHED (VIETSUB / THUYẾT MINH / LỒNG TIẾNG ACTIVE)!")
+    print("  🖼️ CYBER WEB STREAMER HAS LAUNCHED (MOVIE POSTER GRID ACTIVE)!")
     print("  -------------------------------------------------------------")
     print(f"  👉 Truy cập trên Laptop / Điện thoại: \033[92mhttp://{local_ip}:{PORT}\033[96m")
     print(f"  👉 Truy cập tại máy Homelab local:   \033[92mhttp://localhost:{PORT}\033[96m")
