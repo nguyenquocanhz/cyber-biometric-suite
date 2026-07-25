@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # ==============================================================================
 # CYBER WEB STREAMER - HỆ THỐNG XEM PHIM QUA GIAO DIỆN WEB HTML5 (HLS.JS)
-# TÍCH HỢP BỘ QUÉT & STREAM PHIM TỪ Ổ ĐĨA CỤC BỘ NAS / HDD / SSD (/mnt, /media)
+# TÍCH HỢP PROXY TỐI ƯU HÓA LOAD ẢNH POSTER SIÊU TỐC & HLS ANTI-AD FILTER
 # Chạy Web Server tại http://IP-HOMELAB:5000 (Xem trên Laptop / Điện thoại / Tablet)
 # ==============================================================================
 
@@ -18,7 +18,6 @@ import mimetypes
 PORT = 5000
 USER_AGENT = "Mozilla/5.0 (X11; Linux x86_64; rv:120.0) Gecko/20100101 Firefox/120.0"
 
-# Thư mục ổ đĩa NAS / HDD / SSD tự động quét trên Linux & Windows
 NAS_SEARCH_PATHS = [
     "/mnt",
     "/media",
@@ -41,16 +40,12 @@ AD_KEYWORDS = [
 ]
 
 def scan_nas_videos():
-    """
-    Tự động truy quét tất cả file phim (.mp4, .mkv, .avi...) trong các ổ đĩa NAS / HDD / SSD
-    """
     found_files = []
     for base_path in NAS_SEARCH_PATHS:
         if not os.path.exists(base_path):
             continue
         try:
             for root, dirs, files in os.walk(base_path, followlinks=True):
-                # Bỏ qua các thư mục hệ thống rác
                 dirs[:] = [d for d in dirs if not d.startswith('.') and d not in ['proc', 'sys', 'dev', 'vendor', 'node_modules']]
                 
                 for f in files:
@@ -105,13 +100,13 @@ def clean_hls_m3u8(m3u8_content, base_url):
 
     return "\n".join(cleaned_lines)
 
-# Giao diện HTML5 Cyberpunk Web Player hỗ trợ Online & Ổ đĩa NAS / HDD / SSD
+# Giao diện HTML5 Cyberpunk Web Player với Tải ảnh Proxy Siêu Tốc
 HTML_PAGE = """<!DOCTYPE html>
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>⚡ CYBER STREAMER - NAS & ONLINE MEDIA PLATFORM</title>
+    <title>⚡ CYBER STREAMER - FAST IMAGE PROXY & NAS PLATFORM</title>
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
     <style>
         :root {
@@ -205,9 +200,9 @@ HTML_PAGE = """<!DOCTYPE html>
         }
         .poster-img {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            object-fit: cover; transition: transform 0.3s ease;
+            object-fit: cover; transition: transform 0.3s ease, opacity 0.3s ease; opacity: 0.9;
         }
-        .movie-card:hover .poster-img { transform: scale(1.05); }
+        .movie-card:hover .poster-img { transform: scale(1.05); opacity: 1; }
 
         .badge-overlay {
             position: absolute; top: 8px; left: 8px; z-index: 2;
@@ -256,7 +251,7 @@ HTML_PAGE = """<!DOCTYPE html>
 <body>
     <header>
         <h1>⚡ CYBER STREAMER MEDIA PLATFORM</h1>
-        <span>[ 🌐 ONLINE KKPHIM + 💽 LOCAL NAS / HDD / SSD /mnt STREAMER ]</span>
+        <span>[ 🚀 FAST IMAGE PROXY & HLS ANTI-AD FILTER ]</span>
     </header>
 
     <!-- Source Switcher Tabs -->
@@ -326,7 +321,7 @@ HTML_PAGE = """<!DOCTYPE html>
             if (!query) return;
 
             const gridDiv = document.getElementById('movieGrid');
-            gridDiv.innerHTML = '<p style="color: var(--accent-cyan); font-weight: bold;">⏳ Đang tìm kiếm dữ liệu phim...</p>';
+            gridDiv.innerHTML = '<p style="color: var(--accent-cyan); font-weight: bold;">⏳ Đang tải dữ liệu phim và ảnh Poster siêu tốc...</p>';
 
             try {
                 const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
@@ -353,7 +348,8 @@ HTML_PAGE = """<!DOCTYPE html>
                         langText = 'LỒNG TIẾNG';
                     }
 
-                    const posterImg = item.poster_url ? item.poster_url : 'https://via.placeholder.com/300x450/131822/00f3ff?text=NO+POSTER';
+                    // Tải ảnh qua Proxy /proxy/image để load 100% mượt mà không bị chặn
+                    const posterProxy = item.poster_url ? `/proxy/image?url=${encodeURIComponent(item.poster_url)}` : 'https://via.placeholder.com/300x450/131822/00f3ff?text=NO+POSTER';
 
                     card.innerHTML = `
                         <div class="poster-wrapper">
@@ -361,7 +357,7 @@ HTML_PAGE = """<!DOCTYPE html>
                                 <span class="badge ${langBadgeClass}">${langText}</span>
                             </div>
                             <span class="episode-overlay">${item.episode_current || 'HD'}</span>
-                            <img class="poster-img" src="${posterImg}" alt="${item.title}" loading="lazy" onerror="this.src='https://via.placeholder.com/300x450/131822/00f3ff?text=IMAGE+ERROR'">
+                            <img class="poster-img" src="${posterProxy}" alt="${item.title}" loading="lazy">
                         </div>
                         <div class="card-info">
                             <div class="card-title">${item.title}</div>
@@ -540,6 +536,34 @@ class CyberStreamerHandler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(HTML_PAGE.encode('utf-8'))
 
+        elif path == "/proxy/image":
+            img_url = query_params.get("url", [""])[0]
+            if img_url:
+                try:
+                    req = urllib.request.Request(img_url, headers={
+                        "User-Agent": USER_AGENT,
+                        "Referer": "https://phimapi.com/"
+                    })
+                    with urllib.request.urlopen(req, timeout=6) as resp:
+                        img_data = resp.read()
+                        content_type = resp.headers.get("Content-Type", "image/jpeg")
+
+                        self.send_response(200)
+                        self.send_header("Content-Type", content_type)
+                        self.send_header("Cache-Control", "public, max-age=86400") # Cache 24h
+                        self.send_header("Access-Control-Allow-Origin", "*")
+                        self.end_headers()
+                        self.wfile.write(img_data)
+                        return
+                except Exception:
+                    pass
+
+            # Fallback 1x1 transparent GIF
+            self.send_response(200)
+            self.send_header("Content-Type", "image/gif")
+            self.end_headers()
+            self.wfile.write(b'GIF89a\x01\x00\x01\x00\x80\x00\x00\xff\xff\xff\x00\x00\x00!\xf9\x04\x01\x00\x00\x00\x00,\x00\x00\x00\x00\x01\x00\x01\x00\x00\x02\x02D\x01\x00;')
+
         elif path == "/api/nas":
             files = scan_nas_videos()
             self.send_response(200)
@@ -616,7 +640,7 @@ class CyberStreamerHandler(BaseHTTPRequestHandler):
                         self.end_headers()
                         self.wfile.write(clean_content.encode('utf-8'))
                         return
-                except Exception as e:
+                except Exception:
                     pass
 
             self.send_response(500)
@@ -694,7 +718,7 @@ def run():
     httpd = HTTPServer(server_address, CyberStreamerHandler)
 
     print("\033[96m\033[1m")
-    print("  💽 CYBER WEB STREAMER HAS LAUNCHED (LOCAL NAS / HDD / SSD STREAMER ACTIVE)!")
+    print("  🚀 CYBER WEB STREAMER HAS LAUNCHED (FAST IMAGE PROXY ACTIVE)!")
     print("  -------------------------------------------------------------")
     print(f"  👉 Truy cập trên Laptop / Điện thoại: \033[92mhttp://{local_ip}:{PORT}\033[96m")
     print(f"  👉 Truy cập tại máy Homelab local:   \033[92mhttp://localhost:{PORT}\033[96m")
