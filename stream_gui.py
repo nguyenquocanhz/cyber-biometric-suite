@@ -12,9 +12,14 @@ import urllib.parse
 import json
 import tkinter as tk
 from tkinter import ttk, messagebox
-from PIL import Image, ImageTk
 import requests
-from io import BytesIO
+
+# Xử lý tùy chọn Pillow (PIL) - Tự động Fallback nếu chưa cài
+try:
+    from PIL import Image, ImageTk
+    HAS_PIL = True
+except ImportError:
+    HAS_PIL = False
 
 # Cấu hình mã hóa UTF-8
 if sys.platform.startswith('win'):
@@ -49,7 +54,6 @@ class CyberStreamerGUI(tk.Tk):
         self.search_results = []
         self.current_episodes = []
         self.selected_media = None
-        self.poster_cache = {}
 
         self.setup_ui()
 
@@ -173,12 +177,9 @@ class CyberStreamerGUI(tk.Tk):
         )
         self.lbl_media_status.pack(fill="x", padx=15, pady=(0, 15))
 
-        # Poster & Info Frame
+        # Info Frame
         info_frame = tk.Frame(right_col, bg=self.CARD_BG)
         info_frame.pack(fill="x", padx=15, pady=(0, 15))
-
-        self.lbl_poster = tk.Label(info_frame, bg="#1a2334", text="NO POSTER", fg=self.MUTED_TEXT, width=20, height=10)
-        self.lbl_poster.pack(side="left", padx=(0, 15))
 
         self.lbl_description = tk.Label(
             info_frame,
@@ -187,7 +188,7 @@ class CyberStreamerGUI(tk.Tk):
             fg=self.TEXT_COLOR,
             bg=self.CARD_BG,
             justify="left",
-            wraplength=320
+            wraplength=480
         )
         self.lbl_description.pack(side="top", fill="both", expand=True)
 
@@ -243,7 +244,6 @@ class CyberStreamerGUI(tk.Tk):
                         results.append({
                             "id": item.get("slug"),
                             "title": f"{item.get('name')} ({item.get('origin_name')} - {item.get('year')})",
-                            "poster_url": f"https://phimimg.com/{item.get('poster_url')}",
                             "source": "kkphim"
                         })
             except Exception:
@@ -258,7 +258,6 @@ class CyberStreamerGUI(tk.Tk):
                         results.append({
                             "id": r.get("id"),
                             "title": f"{r.get('title')} (EngSub)",
-                            "poster_url": r.get("image"),
                             "source": "gogoanime"
                         })
             except Exception:
