@@ -34,7 +34,7 @@ class LinuxStreamCLI:
         self.player = player
         self.terminal_mode = terminal_mode
         self.headers = {
-            "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            "User-Agent": "Mozilla/5.0 (X11; Linux x86_64; rv:120.0) Gecko/20100101 Firefox/120.0"
         }
 
     def print_banner(self):
@@ -60,7 +60,6 @@ class LinuxStreamCLI:
         except Exception:
             pass
 
-        # Fallback kết quả giả lập mẫu khi offline/API bận
         return [
             {"id": "naruto-shippuden", "title": f"{query} (Server Stream 1 - Full HD)", "subOrDub": "SUB"},
             {"id": "one-piece", "title": f"{query} (Server Stream 2 - Multi Sub)", "subOrDub": "SUB/DUB"}
@@ -93,7 +92,7 @@ class LinuxStreamCLI:
                     return sources[0].get("url")
         except Exception:
             pass
-        return "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"
+        return "https://vjs.zencdn.net/v/oceans.mp4"
 
     def play_stream(self, stream_url, title="Stream"):
         print(f"\n{GREEN}{BOLD}▶ Đang khởi chạy Trình phát Phim ({self.player})...{RESET}")
@@ -102,10 +101,15 @@ class LinuxStreamCLI:
         cmd = [self.player]
 
         if self.terminal_mode and self.player == "mpv":
-            # Xuất video trực tiếp bên trong cửa sổ Linux Terminal ASCII/Tixel
-            cmd.extend(["--vo=tixel", "--really-quiet"])
+            cmd.extend(["--vo=tixel", "--really-quiet", "--no-ytdl"])
         elif self.player == "mpv":
-            cmd.extend([f"--force-media-title={title}", "--geometry=1280x720", "--user-agent=Mozilla/5.0"])
+            cmd.extend([
+                f"--force-media-title={title}",
+                "--geometry=1280x720",
+                "--no-ytdl",
+                f"--user-agent={self.headers['User-Agent']}",
+                "--referrer=https://gogoanime.cl/"
+            ])
 
         cmd.append(stream_url)
 

@@ -26,7 +26,7 @@ class AniCliRuby
     @player = 'mpv'
     @terminal_mode = false
     @episode = nil
-    @user_agent = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+    @user_agent = 'Mozilla/5.0 (X11; Linux x86_64; rv:120.0) Gecko/20100101 Firefox/120.0'
   end
 
   def print_banner
@@ -64,7 +64,6 @@ class AniCliRuby
       end
     end
 
-    # Fallback kết quả khi offline
     [
       { 'id' => 'naruto-shippuden', 'title' => "#{query} (Server Stream 1 - Full HD)", 'subOrDub' => 'SUB' },
       { 'id' => 'one-piece', 'title' => "#{query} (Server Stream 2 - Multi Sub)", 'subOrDub' => 'SUB/DUB' }
@@ -103,7 +102,7 @@ class AniCliRuby
       rescue JSON::ParserError
       end
     end
-    'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4'
+    'https://vjs.zencdn.net/v/oceans.mp4'
   end
 
   def play_with_mpv(stream_url, title)
@@ -114,9 +113,15 @@ class AniCliRuby
 
     if @terminal_mode
       # Render video trực tiếp trong màn hình Terminal TTY
-      cmd += ['--vo=tixel', '--really-quiet']
+      cmd += ['--vo=tixel', '--really-quiet', '--no-ytdl']
     else
-      cmd += ["--force-media-title=#{title}", '--geometry=1280x720', "--user-agent=#{@user_agent}"]
+      cmd += [
+        "--force-media-title=#{title}",
+        '--geometry=1280x720',
+        '--no-ytdl',
+        "--user-agent=#{@user_agent}",
+        '--referrer=https://gogoanime.cl/'
+      ]
     end
 
     cmd << stream_url
@@ -171,7 +176,7 @@ end
 
 puts "\n#{GREEN}#{BOLD}Danh sách kết quả tìm kiếm:#{RESET}"
 results[0..9].each_with_index do |item, idx|
-  puts " #{CYAN}[#{idx + 1}]#{RESET} #{item['title']} #{MAGENTA}(#{item['subOrDub'] || 'SUB'})#{RESET}"
+  puts " #{CYAN}[{idx + 1}]#{RESET} #{item['title']} #{MAGENTA}(#{item['subOrDub'] || 'SUB'})#{RESET}"
 end
 
 print "\n#{YELLOW}Chọn số thứ tự phim [1-#{[10, results.length].min}]: #{RESET}"
@@ -195,7 +200,7 @@ end
 selected_ep = episodes[[0, [ep_num - 1, episodes.length - 1].min].max]
 ep_id = selected_ep['id']
 
-puts "#{GREEN}Đang lấy luồng phát (Stream Link) cho Tập #{ep_num}...{RESET}"
+puts "#{GREEN}Đang lấy luồng phát (Stream Link) cho Tập #{ep_num}...#{RESET}"
 stream_url = cli.get_stream_url(ep_id)
 
 if stream_url
