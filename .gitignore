@@ -1,3 +1,27 @@
+# Exclude all PHP files & Legacy Web Platform
+*.php
+*.html
+*.xml
+*.txt
+*.htaccess
+admin/
+api/
+config/
+database/
+pages/
+model/
+vendor/
+assets/
+css/
+js/
+static/
+noir-theme/
+ftp_manager_wpf/
+composer.json
+composer.lock
+phpunit.xml
+.phpunit.result.cache
+
 # Python & Cache
 __pycache__/
 *.py[cod]
