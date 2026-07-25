@@ -1,0 +1,25 @@
+version: '3.8'
+
+# ==============================================================================
+# CYBER MEDIA STREAMER - DOCKER COMPOSE CONFIGURATION
+# Chạy ứng dụng ngầm tự động khởi động cùng hệ thống (Auto-restart)
+# ==============================================================================
+
+services:
+  cyber-streamer:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: cyber-streamer
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    volumes:
+      # Mount các thư mục NAS / HDD / SSD từ máy Host Linux vào Container
+      - /mnt:/mnt:ro
+      - /media:/media:ro
+      # Mount bộ nhớ đệm Cache ảnh poster
+      - ./cache_images:/app/.cache_images
+    environment:
+      - PYTHONUNBUFFERED=1
+      - PORT=5000
